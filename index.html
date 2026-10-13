@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fauji LLM, base vs baseline (search)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 40px auto; max-width: 1100px; color: #1a1a1a; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p.sub { color: #555; margin-top: 0; }
+  textarea { width: 100%; box-sizing: border-box; padding: 12px; font-size: 15px; border: 1px solid #ccc;
+             border-radius: 8px; resize: vertical; }
+  button { margin-top: 10px; padding: 10px 22px; font-size: 15px; border: none; border-radius: 6px;
+           background: #1a5c3f; color: white; cursor: pointer; }
+  button:disabled { background: #999; cursor: default; }
+  .columns { display: grid; grid-template-columns: 1fr 1fr; margin-top: 24px; border: 1px solid #ddd;
+             border-radius: 8px; overflow: hidden; }
+  .col { padding: 16px 18px; font-size: 14px; line-height: 1.55; min-height: 60px; overflow-wrap: break-word; }
+  .col.base { border-right: 1px solid #ddd; background: #fffdf7; }
+  .col.finetuned { background: #f5fbf7; }
+  .label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+           color: #888; margin-bottom: 8px; }
+  .status { margin-top: 10px; font-size: 13px; color: #777; }
+
+  /* Rendered markdown styling inside each response column */
+  .response h1, .response h2, .response h3 { font-size: 15px; margin: 14px 0 6px; }
+  .response p { margin: 0 0 10px; }
+  .response ul, .response ol { margin: 0 0 10px; padding-left: 22px; }
+  .response li { margin-bottom: 4px; }
+  .response code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .response pre { background: rgba(0,0,0,0.06); padding: 10px 12px; border-radius: 6px; overflow-x: auto; }
+  .response pre code { background: none; padding: 0; }
+  .response blockquote { border-left: 3px solid #ccc; margin: 0 0 10px; padding-left: 10px; color: #555; }
+  .response strong { font-weight: 700; }
+  .truncated-note { margin-top: 10px; font-size: 12px; color: #b45309; font-style: italic; }
+
+  .sources { margin-top: 10px; font-size: 12px; color: #555; }
+  .sources summary { cursor: pointer; color: #1a5c3f; font-weight: 600; }
+  .sources ol { margin: 6px 0 0; padding-left: 20px; }
+  .sources li { margin-bottom: 6px; }
+  .sources .doc { font-weight: 600; color: #333; }
+  .sources .snip { white-space: pre-wrap; color: #666; }
+</style>
+</head>
+<body>
+
+<h1>Armed forces doctrine language model, side by side</h1>
+<p class="sub">Type a question below, the same prompt is sent to the plain base model (no search) and to the fauji.ai baseline (same model + doctrine search). Responses stream in as they're generated, rendered as markdown.</p>
+
+<textarea id="prompt" rows="3">What is meant by force protection in a joint operations context?</textarea>
+<br>
+<button id="runBtn" onclick="runCompare()">Compare responses</button>
+<button id="stopBtn" onclick="stopCompare()" disabled>Stop</button>
+<div class="status" id="status"></div>
+
+<div class="columns">
+  <div class="col base">
+    <div class="label">Base model, no search</div>
+    <div id="baseOut" class="response"></div>
+  </div>
+  <div class="col finetuned">
+    <div class="label">fauji.ai baseline: base model + doctrine search</div>
+    <div id="ftOut" class="response"></div>
+    <div id="ftSources"></div>
+  </div>
+</div>
+
+<script>
+// Fill in the URL Cloudflare Tunnel gives you when you run it on the GPU
+// server, e.g. https://fauji-llm.yourdomain.com or the trycloudflare.com URL
+// for a quick tunnel.
+const GPU_SERVER_URL = "https://tips-manitoba-printable-rid.trycloudflare.com/compare";  
+const API_KEY = "7k9P_m2xL$8vQW1zR#5bN0uY4tE9aC3iO7pK8wF2mS0vX5jZ1dH4gL6qT9yU3eI";
+
+let currentController = null;
+
+// Raw markdown text accumulated per model, kept separately from the
+// rendered HTML, since we re-render from the raw text on every chunk.
+let baseRaw = "";
+let ftRaw = "";
+
+function renderMarkdown(el, rawText) {
+  el.innerHTML = marked.parse(rawText);
+}
+
+async function runCompare() {
+  const prompt = document.getElementById('prompt').value.trim();
+  const btn = document.getElementById('runBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const status = document.getElementById('status');
+  const baseOut = document.getElementById('baseOut');
+  const ftOut = document.getElementById('ftOut');
+
+  if (!prompt) return;
+
+  currentController = new AbortController();
+  btn.disabled = true;
+  stopBtn.disabled = false;
+  status.textContent = "Streaming responses...";
+  baseRaw = "";
+  ftRaw = "";
+  baseOut.innerHTML = "";
+  ftOut.innerHTML = "";
+  document.getElementById('ftSources').innerHTML = "";
+
+  let baseTruncated = false, ftTruncated = false;
+
+  try {
+    const resp = await fetch(GPU_SERVER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY
+      },
+      body: JSON.stringify({ prompt }),
+      signal: currentController.signal
+    });
+
+    if (!resp.ok) {
+      let detail = resp.statusText;
+      try { detail = (await resp.json()).detail || detail; } catch (e) {}
+      status.textContent = "Error: " + detail;
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let baseDone = false, ftDone = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();  // keep the possibly-incomplete last line for next time
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const item = JSON.parse(line);
+        const isBase = item.model === "base";
+        if (item.sources) renderSources(document.getElementById('ftSources'), item.sources);
+        if (item.error) status.textContent = "Server error (" + item.model + "): " + item.error;
+
+        if (item.chunk) {
+          if (isBase) baseRaw += item.chunk; else ftRaw += item.chunk;
+          renderMarkdown(isBase ? baseOut : ftOut, isBase ? baseRaw : ftRaw);
+        }
+        if (item.done) {
+          if (isBase) { baseDone = true; baseTruncated = !!item.truncated; }
+          else { ftDone = true; ftTruncated = !!item.truncated; }
+        }
+      }
+      status.textContent = (baseDone && ftDone) ? "Done." :
+        `Streaming... (base ${baseDone ? "done" : "in progress"}, baseline ${ftDone ? "done" : "in progress"})`;
+    }
+
+    if (baseTruncated) {
+      baseOut.insertAdjacentHTML('beforeend', '<div class="truncated-note">Response cut off, increase max_new_tokens.</div>');
+    }
+    if (ftTruncated) {
+      ftOut.insertAdjacentHTML('beforeend', '<div class="truncated-note">Response cut off, increase max_new_tokens.</div>');
+    }
+    status.textContent = "Done.";
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      status.textContent = "Stopped. The GPU server may still be finishing this generation in the background.";
+    } else {
+      status.textContent = "Request failed: " + err;
+    }
+  } finally {
+    btn.disabled = false;
+    stopBtn.disabled = true;
+    currentController = null;
+  }
+}
+
+
+function renderSources(container, sources) {
+  // Excerpts the answer was based on (text inserted with textContent, never as HTML).
+  container.innerHTML = "";
+  if (!sources || !sources.length) return;
+  const det = document.createElement('details');
+  det.className = 'sources';
+  const sum = document.createElement('summary');
+  sum.textContent = `Sources (${sources.length} excerpts searched)`;
+  det.appendChild(sum);
+  const ol = document.createElement('ol');
+  sources.forEach(s => {
+    const li = document.createElement('li');
+    const d = document.createElement('div'); d.className = 'doc'; d.textContent = s.doc_id || '(unknown document)';
+    const t = document.createElement('div'); t.className = 'snip'; t.textContent = (s.snippet || '') + ' …';
+    li.appendChild(d); li.appendChild(t); ol.appendChild(li);
+  });
+  det.appendChild(ol);
+  container.appendChild(det);
+}
+
+function stopCompare() {
+  if (currentController) {
+    currentController.abort();
+  }
+}
+</script>
+
+</body>
+</html>

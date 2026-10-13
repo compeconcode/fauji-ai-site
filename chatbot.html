@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fauji.ai: AI assistant who speaks Indian Armed Forces language</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 auto; max-width: 760px;
+         padding: 24px; color: #1a1a1a; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: #555; margin: 0 0 16px; font-size: 13px; }
+
+  #chatWindow { flex: 1; overflow-y: auto; border: 1px solid #ddd; border-radius: 10px; padding: 16px;
+                display: flex; flex-direction: column; gap: 14px; background: #fafafa; }
+
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 10px; line-height: 1.5; font-size: 14px; }
+  .msg.user { align-self: flex-end; background: #1a5c3f; color: white; }
+  .msg.assistant { align-self: flex-start; background: white; border: 1px solid #e0e0e0; }
+  .msg.assistant .response p { margin: 0 0 8px; }
+  .msg.assistant .response ul, .msg.assistant .response ol { margin: 0 0 8px; padding-left: 20px; }
+  .msg.assistant .response code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .msg.assistant .response pre { background: rgba(0,0,0,0.06); padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+
+  .toolbar { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+  .toolbar button { border: 1px solid #ddd; background: white; border-radius: 6px; padding: 4px 9px;
+                     font-size: 13px; cursor: pointer; color: #555; }
+  .toolbar button.active-up { background: #e6f4ea; border-color: #1a5c3f; color: #1a5c3f; }
+  .toolbar button.active-down { background: #fdeaea; border-color: #b3261e; color: #b3261e; }
+  .toolbar button:hover { background: #f0f0f0; }
+  .toolbar .feedback-status { font-size: 12px; color: #888; }
+
+  .truncated-note { font-size: 12px; color: #b45309; font-style: italic; margin-top: 6px; }
+
+  #inputRow { display: flex; gap: 8px; margin-top: 14px; }
+  #promptInput { flex: 1; padding: 10px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px;
+                 resize: none; font-family: inherit; }
+  #inputRow button { padding: 0 18px; border: none; border-radius: 8px; background: #1a5c3f; color: white;
+                      font-size: 14px; cursor: pointer; }
+  #inputRow button:disabled { background: #999; cursor: default; }
+  #stopBtn { background: #b3261e; }
+  .status { font-size: 12px; color: #888; margin-top: 6px; min-height: 16px; }
+
+  .sources { margin-top: 10px; font-size: 12px; color: #555; }
+  .sources summary { cursor: pointer; color: #1a5c3f; font-weight: 600; }
+  .sources ol { margin: 6px 0 0; padding-left: 20px; }
+  .sources li { margin-bottom: 6px; }
+  .sources .doc { font-weight: 600; color: #333; }
+  .sources .snip { white-space: pre-wrap; color: #666; }
+</style>
+</head>
+<body>
+
+<h1>fauji.ai: AI assistant who speaks Indian Armed Forces language</h1>
+<p class="sub">Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs to flag good or bad answers, that feedback is saved for review.</p>
+
+<div id="chatWindow"></div>
+<div class="status" id="status"></div>
+
+<div id="inputRow">
+  <textarea id="promptInput" rows="2" placeholder="Type a message..."></textarea>
+  <button id="sendBtn" onclick="sendMessage()">Send</button>
+  <button id="stopBtn" onclick="stopStreaming()" disabled>Stop</button>
+</div>
+
+<script>
+// Fill in the URL Cloudflare Tunnel gives you for THIS server (port 8001 on
+// the GPU side), and the same API key you set with FAUJI_LLM_API_KEY.
+const CHAT_URL = "https://meanwhile-unable-catch-produces.trycloudflare.com/chat";
+const FEEDBACK_URL = "https://meanwhile-unable-catch-produces.trycloudflare.com/feedback";
+const API_KEY = "7k9P_m2xL$8vQW1zR#5bN0uY4tE9aC3iO7pK8wF2mS0vX5jZ1dH4gL6qT9yU3eI";
+
+let messages = [];          // [{role, content}], the full conversation so far
+let currentController = null;
+
+const chatWindow = document.getElementById('chatWindow');
+const status = document.getElementById('status');
+const sendBtn = document.getElementById('sendBtn');
+const stopBtn = document.getElementById('stopBtn');
+const promptInput = document.getElementById('promptInput');
+
+promptInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function renderAll() {
+  chatWindow.innerHTML = "";
+  messages.forEach((m, i) => {
+    if (m.role === 'user') {
+      const div = document.createElement('div');
+      div.className = 'msg user';
+      div.textContent = m.content;
+      chatWindow.appendChild(div);
+    } else {
+      appendAssistantBubble(m.content, i, m.turn_id, m.truncated, m.vote, m.sources);
+    }
+  });
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function appendAssistantBubble(content, index, turnId, truncated, vote, sources) {
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+  div.id = `msg-${index}`;
+
+  const responseDiv = document.createElement('div');
+  responseDiv.className = 'response';
+  responseDiv.innerHTML = marked.parse(content || "");
+  div.appendChild(responseDiv);
+
+  if (truncated) {
+    const note = document.createElement('div');
+    note.className = 'truncated-note';
+    note.textContent = 'Response cut off, increase max_new_tokens.';
+    div.appendChild(note);
+  }
+
+  const srcDiv = document.createElement('div');
+  srcDiv.className = 'sources-holder';
+  renderSources(srcDiv, sources);
+  div.appendChild(srcDiv);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'toolbar';
+
+  const regenBtn = document.createElement('button');
+  regenBtn.textContent = '↻ Regenerate';
+  regenBtn.onclick = () => regenerate(index);
+  toolbar.appendChild(regenBtn);
+
+  const upBtn = document.createElement('button');
+  upBtn.textContent = '👍';
+  upBtn.className = vote === 'up' ? 'active-up' : '';
+  upBtn.onclick = () => vote_(index, turnId, 'up', upBtn, downBtn);
+  toolbar.appendChild(upBtn);
+
+  const downBtn = document.createElement('button');
+  downBtn.textContent = '👎';
+  downBtn.className = vote === 'down' ? 'active-down' : '';
+  downBtn.onclick = () => vote_(index, turnId, 'down', upBtn, downBtn);
+  toolbar.appendChild(downBtn);
+
+  const feedbackStatus = document.createElement('span');
+  feedbackStatus.className = 'feedback-status';
+  feedbackStatus.id = `feedback-status-${index}`;
+  toolbar.appendChild(feedbackStatus);
+
+  div.appendChild(toolbar);
+  chatWindow.appendChild(div);
+  return responseDiv;
+}
+
+async function sendMessage() {
+  const text = promptInput.value.trim();
+  if (!text) return;
+  promptInput.value = "";
+  messages.push({ role: 'user', content: text });
+  renderAll();
+  await streamAssistantReply();
+}
+
+async function regenerate(index) {
+  // Drop this assistant message and everything after it, then re-send the
+  // conversation as it stood right before this reply.
+  messages = messages.slice(0, index);
+  renderAll();
+  await streamAssistantReply();
+}
+
+async function streamAssistantReply() {
+  sendBtn.disabled = true;
+  stopBtn.disabled = false;
+  status.textContent = "Streaming...";
+
+  currentController = new AbortController();
+
+  const placeholderIndex = messages.length;
+  messages.push({ role: 'assistant', content: '', turn_id: null, truncated: false, vote: null, sources: null });
+  renderAll();
+  const responseDiv = document.querySelector(`#msg-${placeholderIndex} .response`);
+
+  try {
+    const resp = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+      body: JSON.stringify({
+        messages: messages.slice(0, placeholderIndex).map(m => ({ role: m.role, content: m.content }))
+      }),
+      signal: currentController.signal
+    });
+
+    if (!resp.ok) {
+      let detail = resp.statusText;
+      try { detail = (await resp.json()).detail || detail; } catch (e) {}
+      status.textContent = "Error: " + detail;
+      messages.pop();
+      renderAll();
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let accumulated = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const item = JSON.parse(line);
+        messages[placeholderIndex].turn_id = item.turn_id;
+        if (item.sources) messages[placeholderIndex].sources = item.sources;
+        if (item.error) status.textContent = "Server error: " + item.error;
+        if (item.chunk) {
+          accumulated += item.chunk;
+          messages[placeholderIndex].content = accumulated;
+          if (responseDiv) responseDiv.innerHTML = marked.parse(accumulated);
+          chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+        if (item.done) {
+          messages[placeholderIndex].truncated = !!item.truncated;
+        }
+      }
+    }
+    if (!status.textContent.startsWith("Server error")) status.textContent = "Done.";
+    renderAll();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      status.textContent = "Stopped. The GPU server may still be finishing this reply in the background.";
+    } else {
+      status.textContent = "Request failed: " + err;
+      messages.pop();
+      renderAll();
+    }
+  } finally {
+    sendBtn.disabled = false;
+    stopBtn.disabled = true;
+    currentController = null;
+  }
+}
+
+
+function renderSources(container, sources) {
+  // Excerpts the answer was based on (text inserted with textContent, never as HTML).
+  container.innerHTML = "";
+  if (!sources || !sources.length) return;
+  const det = document.createElement('details');
+  det.className = 'sources';
+  const sum = document.createElement('summary');
+  sum.textContent = `Sources (${sources.length} excerpts searched)`;
+  det.appendChild(sum);
+  const ol = document.createElement('ol');
+  sources.forEach(s => {
+    const li = document.createElement('li');
+    const d = document.createElement('div'); d.className = 'doc'; d.textContent = s.doc_id || '(unknown document)';
+    const t = document.createElement('div'); t.className = 'snip'; t.textContent = (s.snippet || '') + ' …';
+    li.appendChild(d); li.appendChild(t); ol.appendChild(li);
+  });
+  det.appendChild(ol);
+  container.appendChild(det);
+}
+
+function stopStreaming() {
+  if (currentController) currentController.abort();
+}
+
+async function vote_(index, turnId, voteValue, upBtn, downBtn) {
+  messages[index].vote = voteValue;
+  upBtn.className = voteValue === 'up' ? 'active-up' : '';
+  downBtn.className = voteValue === 'down' ? 'active-down' : '';
+
+  const feedbackStatus = document.getElementById(`feedback-status-${index}`);
+  let comment = null;
+  if (voteValue === 'down') {
+    comment = prompt("Optional: what was wrong with this response? (leave blank to skip)");
+  }
+
+  feedbackStatus.textContent = "saving...";
+  try {
+    const resp = await fetch(FEEDBACK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+      body: JSON.stringify({
+        turn_id: turnId,
+        vote: voteValue,
+        comment: comment || null,
+        messages: messages.slice(0, index + 1).map(m => ({ role: m.role, content: m.content }))
+      })
+    });
+    feedbackStatus.textContent = resp.ok ? "feedback saved" : "failed to save feedback";
+  } catch (e) {
+    feedbackStatus.textContent = "failed to save feedback";
+  }
+}
+</script>
+
+</body>
+</html>
