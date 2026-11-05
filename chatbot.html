@@ -46,17 +46,34 @@
   .sources li { margin-bottom: 6px; }
   .sources .doc { font-weight: 600; color: #333; }
   .sources .snip { white-space: pre-wrap; color: #666; }
+  .sources .doc.uploaded { color: #1a5c3f; }
+
+  #docChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  #docChips:empty { display: none; }
+  .chip { display: flex; align-items: center; gap: 6px; background: #eef6f1; border: 1px solid #1a5c3f;
+          color: #1a5c3f; border-radius: 14px; padding: 3px 6px 3px 10px; font-size: 12px; max-width: 100%; }
+  .chip.busy { background: #fff7e0; border-color: #b45309; color: #b45309; }
+  .chip .x { cursor: pointer; border: none; background: none; color: #b3261e; font-size: 15px; padding: 0 4px;
+             line-height: 1; }
+  #inputRow #attachBtn { background: white; color: #1a5c3f; border: 1px solid #1a5c3f; padding: 0 12px;
+                         font-size: 16px; }
+  .notice { font-size: 12px; color: #b45309; margin-top: 6px; }
+  .notice:empty { display: none; }
 </style>
 </head>
 <body>
 
 <h1>fauji.ai: AI assistant who speaks Indian Armed Forces language</h1>
-<p class="sub">Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs to flag good or bad answers, that feedback is saved for review.</p>
+<p class="sub">Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs to flag good or bad answers, that feedback is saved for review. Use the paperclip to attach a PDF, DOCX or TXT file (up to 3 files, 20 MB each): your questions are then answered from your file as well. The file is kept only for this chat session. This is a public demo: do not attach sensitive or classified documents.</p>
 
 <div id="chatWindow"></div>
 <div class="status" id="status"></div>
+<div class="notice" id="notice"></div>
+<div id="docChips"></div>
 
 <div id="inputRow">
+  <button id="attachBtn" title="Attach a document (PDF, DOCX or TXT)" onclick="document.getElementById('fileInput').click()">&#128206;</button>
+  <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple style="display:none">
   <textarea id="promptInput" rows="2" placeholder="Type a message..."></textarea>
   <button id="sendBtn" onclick="sendMessage()">Send</button>
   <button id="stopBtn" onclick="stopStreaming()" disabled>Stop</button>
@@ -68,6 +85,16 @@
 const CHAT_URL = "https://stress-wyoming-derived-cold.trycloudflare.com/chat";
 const FEEDBACK_URL = "https://stress-wyoming-derived-cold.trycloudflare.com/feedback";
 const API_KEY = "7k9P_m2xL$8vQW1zR#5bN0uY4tE9aC3iO7pK8wF2mS0vX5jZ1dH4gL6qT9yU3eI";
+const UPLOAD_URL = CHAT_URL.replace(/\/chat$/, '/upload');   // follows CHAT_URL, so the tunnel watchdog needs no change
+const MAX_FILE_MB = 20, MAX_DOCS = 3;
+
+function makeSessionId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const a = new Uint8Array(16); crypto.getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+}
+const SESSION_ID = makeSessionId();   // new on every page load: attached files belong to this page session
+let docs = [];                        // attached files: [{name, doc_id, pages, mode, busy}]
 
 let messages = [];          // [{role, content}], the full conversation so far
 let currentController = null;
@@ -155,6 +182,7 @@ function appendAssistantBubble(content, index, turnId, truncated, vote, sources)
 async function sendMessage() {
   const text = promptInput.value.trim();
   if (!text) return;
+  if (docs.some(d => d.busy)) { status.textContent = "Please wait until the attached file has been read."; return; }
   promptInput.value = "";
   messages.push({ role: 'user', content: text });
   renderAll();
@@ -181,12 +209,16 @@ async function streamAssistantReply() {
   renderAll();
   const responseDiv = document.querySelector(`#msg-${placeholderIndex} .response`);
 
+  const docIds = docs.filter(d => d.doc_id && !d.busy).map(d => d.doc_id);
+  messages[placeholderIndex].with_doc = docIds.length > 0;
+
   try {
     const resp = await fetch(CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
       body: JSON.stringify({
-        messages: messages.slice(0, placeholderIndex).map(m => ({ role: m.role, content: m.content }))
+        messages: messages.slice(0, placeholderIndex).map(m => ({ role: m.role, content: m.content })),
+        ...(docIds.length ? { session_id: SESSION_ID, doc_ids: docIds } : {})
       }),
       signal: currentController.signal
     });
@@ -194,6 +226,7 @@ async function streamAssistantReply() {
     if (!resp.ok) {
       let detail = resp.statusText;
       try { detail = (await resp.json()).detail || detail; } catch (e) {}
+      if (resp.status === 410) { docs = []; renderChips(); }   // the server no longer has the files
       status.textContent = "Error: " + detail;
       messages.pop();
       renderAll();
@@ -254,18 +287,94 @@ function renderSources(container, sources) {
   const det = document.createElement('details');
   det.className = 'sources';
   const sum = document.createElement('summary');
-  sum.textContent = `Sources (${sources.length} excerpts searched)`;
+  const nUp = sources.filter(s => s.uploaded).length;
+  sum.textContent = `Sources (${sources.length} excerpts searched` + (nUp ? `, ${nUp} from your document` : '') + `)`;
   det.appendChild(sum);
   const ol = document.createElement('ol');
   sources.forEach(s => {
     const li = document.createElement('li');
-    const d = document.createElement('div'); d.className = 'doc'; d.textContent = s.doc_id || '(unknown document)';
+    const d = document.createElement('div'); d.className = 'doc' + (s.uploaded ? ' uploaded' : ''); d.textContent = s.doc_id || '(unknown document)';
     const t = document.createElement('div'); t.className = 'snip'; t.textContent = (s.snippet || '') + ' …';
     li.appendChild(d); li.appendChild(t); ol.appendChild(li);
   });
   det.appendChild(ol);
   container.appendChild(det);
 }
+
+// ---------------------------------------------------------------- attached documents
+const noticeEl = document.getElementById('notice');
+function notice(text) { noticeEl.textContent = text || ""; }
+
+function renderChips() {
+  const box = document.getElementById('docChips');
+  box.innerHTML = "";
+  docs.forEach(d => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (d.busy ? ' busy' : '');
+    const label = document.createElement('span');
+    let info = d.busy ? 'reading...' : (d.pages ? `${d.pages} pages, ` : '') + (d.mode === 'whole' ? 'used whole' : 'searched for each question');
+    label.textContent = `${d.name} (${info})`;
+    chip.appendChild(label);
+    if (!d.busy) {
+      const x = document.createElement('button');
+      x.className = 'x'; x.textContent = '\u00d7'; x.title = 'Remove this file';
+      x.onclick = () => removeDoc(d);
+      chip.appendChild(x);
+    }
+    box.appendChild(chip);
+  });
+}
+
+async function uploadFile(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!['pdf', 'docx', 'txt'].includes(ext)) { notice(`${file.name}: only PDF, DOCX and TXT files can be attached.`); return; }
+  if (file.size > MAX_FILE_MB * 1024 * 1024) { notice(`${file.name}: larger than ${MAX_FILE_MB} MB.`); return; }
+  if (docs.length >= MAX_DOCS) { notice(`At most ${MAX_DOCS} files can be attached. Remove one first.`); return; }
+  notice("");
+  const entry = { name: file.name, busy: true };
+  docs.push(entry);
+  renderChips();
+  status.textContent = `Reading ${file.name} ... (scanned PDFs are read with OCR and take longer)`;
+  try {
+    const resp = await fetch(`${UPLOAD_URL}?session_id=${SESSION_ID}&filename=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'x-api-key': API_KEY },
+      body: file
+    });
+    let data = {};
+    try { data = await resp.json(); } catch (e) {}
+    if (!resp.ok) {
+      docs = docs.filter(d => d !== entry); renderChips();
+      notice(`${file.name}: ${data.detail || resp.statusText}`);
+      status.textContent = "";
+      return;
+    }
+    Object.assign(entry, data, { busy: false });
+    renderChips();
+    status.textContent = `${file.name} attached.`;
+    if (data.warnings && data.warnings.length) notice(`${file.name}: ` + data.warnings.join(' '));
+  } catch (err) {
+    docs = docs.filter(d => d !== entry); renderChips();
+    notice(`${file.name}: upload failed (${err}).`);
+    status.textContent = "";
+  }
+}
+
+async function removeDoc(entry) {
+  docs = docs.filter(d => d !== entry);
+  renderChips();
+  if (entry.doc_id) {
+    try {
+      await fetch(`${UPLOAD_URL}/${entry.doc_id}?session_id=${SESSION_ID}`, { method: 'DELETE', headers: { 'x-api-key': API_KEY } });
+    } catch (e) {}
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  e.target.value = "";
+  for (const f of files) await uploadFile(f);
+});
 
 function stopStreaming() {
   if (currentController) currentController.abort();
@@ -291,6 +400,7 @@ async function vote_(index, turnId, voteValue, upBtn, downBtn) {
         turn_id: turnId,
         vote: voteValue,
         comment: comment || null,
+        with_document: !!messages[index].with_doc,
         messages: messages.slice(0, index + 1).map(m => ({ role: m.role, content: m.content }))
       })
     });
