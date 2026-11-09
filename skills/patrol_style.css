@@ -1,0 +1,126 @@
+:root{
+  color-scheme:light;
+  --bg:#F2F5F8; --surface:#FFFFFF; --raised:#EDF1F5; --sunken:#E4EAF0;
+  --ink:#0F1821; --ink2:#53606E; --ink3:#8590A0;
+  --rule:#D5DDE6; --rule-soft:#E7EDF3;
+  --accent:#12507E; --accent-ink:#FFFFFF; --accent-soft:#DCEAF6;
+  --ok:#1C7A57; --warn:#9A5B00; --warn-soft:#FBF0DC; --err:#A82A1E; --err-soft:#FBE6E3;
+  --shadow:0 1px 2px rgba(15,24,33,.06),0 6px 18px rgba(15,24,33,.05);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0A0E13; --surface:#141A22; --raised:#1D242D; --sunken:#0F151B;
+    --ink:#E6ECF3; --ink2:#95A3B3; --ink3:#69757F;
+    --rule:#253039; --rule-soft:#1B222A;
+    --accent:#4E9BD6; --accent-ink:#06121C; --accent-soft:#12293C;
+    --ok:#5FBE98; --warn:#D9A441; --warn-soft:#2B2314; --err:#E58072; --err-soft:#2E1917;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.28);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:26px 18px 80px;
+  display:flex;flex-direction:column;gap:20px}
+.wrap.narrow{max-width:860px}
+
+header{display:flex;flex-direction:column;gap:5px;
+  border-bottom:2px solid var(--ink);padding-bottom:14px}
+h1{margin:0;font-size:23px;font-weight:700;letter-spacing:-.015em}
+header p{margin:0;color:var(--ink2);font-size:14.5px}
+
+/* ---------------- boot ---------------- */
+#boot{display:flex;align-items:center;gap:12px;background:var(--surface);
+  border:1px solid var(--rule);border-radius:8px;padding:13px 16px;font-size:14px}
+#boot .spin{width:15px;height:15px;border:2px solid var(--rule);
+  border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+#boot.done{display:none}
+#boot .sub{color:var(--ink3);font-size:12.5px}
+
+/* ---------------- form ---------------- */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:8px;
+  box-shadow:var(--shadow)}
+.card > h2{margin:0;padding:13px 18px;font-size:13px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);
+  border-bottom:1px solid var(--rule-soft)}
+.card .body{padding:16px 18px}
+fieldset{border:0;margin:0;padding:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.f{display:flex;flex-direction:column;gap:5px}
+.f label{font-size:12.5px;font-weight:600;color:var(--ink)}
+.f .hint{font-size:11.5px;color:var(--ink3);line-height:1.35}
+input,select{font:inherit;font-size:14px;padding:8px 10px;border-radius:6px;
+  border:1px solid var(--rule);background:var(--raised);color:var(--ink);width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:1px}
+input[type=number]{font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums}
+input.bad{border-color:var(--err);background:var(--err-soft)}
+
+/* areas table */
+.areas{display:flex;flex-direction:column;gap:8px}
+.arow{display:grid;grid-template-columns:1fr 120px 120px 36px;gap:9px;align-items:end}
+.arow .rm{padding:8px 0;border-radius:6px;border:1px solid var(--rule);
+  background:var(--raised);color:var(--ink2);cursor:pointer;font-size:15px;line-height:1}
+.arow .rm:hover{border-color:var(--err);color:var(--err)}
+.arow.hdr{align-items:center}
+.arow.hdr span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3)}
+@media(max-width:620px){.arow{grid-template-columns:1fr 1fr;}.arow .rm{grid-column:2}
+  .arow.hdr{display:none}}
+
+button{font:inherit;font-size:14px;padding:9px 16px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--rule);background:var(--raised);color:var(--ink);font-weight:500}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover:not(:disabled){filter:brightness(1.08)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  padding:14px 18px;border-top:1px solid var(--rule-soft)}
+.actions .sp{margin-left:auto}
+
+/* ---------------- messages ---------------- */
+.msg{border-radius:7px;padding:12px 15px;font-size:14px;display:flex;
+  flex-direction:column;gap:5px}
+.msg.err{background:var(--err-soft);border:1px solid var(--err);color:var(--ink)}
+.msg.err b{color:var(--err)}
+.msg.note{background:var(--warn-soft);border-left:3px solid var(--warn);border-radius:0 6px 6px 0}
+
+/* ---------------- results ---------------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:13px 15px;
+  display:flex;flex-direction:column;gap:3px}
+.tile .l{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.tile .v{font-size:25px;font-weight:700;letter-spacing:-.02em;line-height:1.15;
+  font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.tile .s{font-size:12.5px;color:var(--ink2)}
+.tile.good .v{color:var(--ok)} .tile.bad .v{color:var(--err)}
+
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);
+  font-weight:600;border-bottom:1px solid var(--rule)}
+td.n,th.n{text-align:right;font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;
+  background:var(--raised);color:var(--ink2);border:1px solid var(--rule)}
+.pill.off{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+
+iframe{width:100%;border:0;border-radius:8px;background:var(--surface);display:block}
+.hidden{display:none!important}
+footer{color:var(--ink3);font-size:12.5px;border-top:1px solid var(--rule);padding-top:14px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- fauji.ai side-panel overrides (the form is shown inside a narrow panel) ---- */
+.wrap,.wrap.narrow{max-width:none;padding:14px 14px 28px;gap:14px}
+.lead{margin:0;color:var(--ink2);font-size:13.5px}
+.card > h2{display:none}

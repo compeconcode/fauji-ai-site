@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patrol Timetable</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312507E'/%3E%3Cg fill='%23fff'%3E%3Crect x='6' y='9' width='7' height='4' rx='2'/%3E%3Crect x='17' y='14' width='9' height='4' rx='2'/%3E%3Crect x='6' y='19' width='12' height='4' rx='2'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f6f5; --surface:#fcfcfb; --raised:#eef1f0;
+  --ink:#0b0b0b; --ink-2:#52514e; --ink-3:#83817b;
+  --rule:#d8dedc; --rule-soft:#e7ebea;
+  --accent:#2a78d6;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948; --s9:#83817b;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111413; --surface:#1a1a19; --raised:#232726;
+    --ink:#ffffff; --ink-2:#c3c2b7; --ink-3:#8d8c85;
+    --rule:#343836; --rule-soft:#262a29;
+    --accent:#3987e5;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --s9:#8d8c85;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111413; --surface:#1a1a19; --raised:#232726;
+  --ink:#ffffff; --ink-2:#c3c2b7; --ink-3:#8d8c85;
+  --rule:#343836; --rule-soft:#262a29;
+  --accent:#3987e5;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --s9:#8d8c85;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1500px;margin:0 auto;padding:20px 18px 60px;display:flex;flex-direction:column;gap:16px}
+
+header{display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--rule);padding-bottom:14px}
+h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.01em}
+.stats{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:12.5px;color:var(--ink-2)}
+.stats b{color:var(--ink);font-weight:600}
+
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+  background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:10px 12px}
+.grp{display:flex;align-items:center;gap:6px}
+.grp>label{font-size:11.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+select,input[type=search]{font:inherit;font-size:13px;padding:5px 8px;border-radius:5px;
+  border:1px solid var(--rule);background:var(--raised);color:var(--ink)}
+button{font:inherit;font-size:12.5px;padding:5px 11px;border-radius:5px;cursor:pointer;
+  border:1px solid var(--rule);background:var(--raised);color:var(--ink)}
+button:hover{border-color:var(--accent)}
+/* scope the pressed fill to the view toggles -- the legend chips are also
+   aria-pressed buttons, and without :not(.chip) they get painted solid accent,
+   which hides their own colour swatch. */
+button[aria-pressed=true]:not(.chip){background:var(--accent);border-color:var(--accent);color:#fff}
+.chip[aria-pressed=true]{border-color:var(--ink-3)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;
+  border:1px solid var(--rule);border-radius:999px;background:var(--raised);cursor:pointer;color:var(--ink)}
+.chip .sw{width:11px;height:11px;border-radius:3px;flex:none}
+.chip[aria-pressed=false]{opacity:.4}
+
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+#stage{display:block;width:100%;cursor:grab;touch-action:none}
+#stage.drag{cursor:grabbing}
+.hint{font-size:12px;color:var(--ink-3);padding:0 2px}
+
+#tip{position:fixed;pointer-events:none;z-index:9;opacity:0;transition:opacity .08s;
+  background:var(--surface);border:1px solid var(--rule);border-radius:6px;
+  padding:9px 11px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:280px}
+#tip .th{font-weight:650;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+#tip .th .sw{width:10px;height:10px;border-radius:3px;flex:none}
+#tip dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 12px}
+#tip dt{color:var(--ink-3)}
+#tip dd{margin:0;text-align:right}
+
+details{background:var(--surface);border:1px solid var(--rule);border-radius:6px}
+summary{cursor:pointer;padding:11px 14px;font-weight:600;font-size:13.5px}
+.tblwrap{max-height:460px;overflow:auto;border-top:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:6px 12px;text-align:left;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface);font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--ink-3);border-bottom:1px solid var(--rule)}
+td.r,th.r{text-align:right}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.warn{background:var(--raised);border:1px solid var(--rule);border-left:3px solid var(--s2);
+  border-radius:5px;padding:10px 13px;font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Patrol timetable</h1>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="bar">
+    <div class="grp"><label for="strat">Plan</label><select id="strat"></select></div>
+    <div class="grp">
+      <label>View</label>
+      <button id="vAir" aria-pressed="true">By aircraft</button>
+      <button id="vBar" aria-pressed="false">By barrier</button>
+    </div>
+    <div class="grp" id="chips"></div>
+    <div class="grp" style="margin-left:auto">
+      <input type="search" id="find" placeholder="filter rows, e.g. AC-7" style="width:150px">
+      <button id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+      <button id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+      <button id="reset">Reset zoom</button>
+    </div>
+  </div>
+
+  <div class="panel"><canvas id="stage"></canvas></div>
+  <div class="hint" id="hint"></div>
+
+  <div class="warn" id="fails" hidden=""></div>
+
+  <details>
+    <summary>Sortie table — every sortie, searchable</summary>
+    <div class="tblwrap">
+      <table id="tbl">
+        <thead><tr><th class="r">#</th><th>Barrier</th><th>Aircraft</th>
+          <th class="r">Depart</th><th class="r">Land</th><th class="r">Protected until</th>
+          <th class="r">t (h)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Aircraft loading</summary>
+    <div class="tblwrap">
+      <table id="atbl">
+        <thead><tr><th>Aircraft</th><th class="r">Sorties</th><th class="r">Hours flown</th>
+          <th class="r">Budget F</th><th class="r">Min gap</th><th class="r">Wrap gap</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </details>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+const D = (function(){
+  // The form page (index.html) solves, stashes the payload, then navigates
+  // here. Everything below this line is the standalone timetable viewer,
+  // unchanged (in the fauji.ai chat page the side panel stores the plan and loads this page). Arriving here without a plan just bounces back to the form.
+  try{ var s = sessionStorage.getItem("patrolPlan"); if(s) return JSON.parse(s); }
+  catch(e){}
+  document.body.innerHTML = '<p style="padding:16px;font:14px sans-serif">No timetable yet. Fill in the inputs and press Generate timetable.</p>';
+  throw new Error("no plan in this tab");
+})();
+const P = D.params;
+const SL = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8","--s9"];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const TYPES = D.types.map(t => t.name);
+const colOf = n => css(SL[Math.min(TYPES.indexOf(n), 8)]);
+
+let S = { si:0, view:"air", hidden:new Set(), t0:0, t1:P.T, find:"", scroll:0, hot:null };
+
+/* ---------- formatting ---------- */
+function clock(t){
+  if(P.T<=48){const h=Math.floor(t),m=Math.round((t-h)*60);
+    return String(h%24).padStart(2,"0")+":"+String(m===60?0:m).padStart(2,"0");}
+  const d=Math.floor(t/24), r=t-d*24, h=Math.floor(r), m=Math.round((r-h)*60);
+    return "d"+String(d+1).padStart(2,"0")+" "+String(h).padStart(2,"0")+":"+String(m===60?0:m).padStart(2,"0");
+}
+const hrs = t => t.toFixed(2)+" h";
+
+/* ---------- header ---------- */
+document.getElementById("stats").innerHTML = [
+  ["Fleet", P.N+" aircraft"], ["Barriers", P.N_b+" over "+P.K+" types"],
+  ["Horizon", P.T+" h"], ["Sortie", P.tau_p+" h"], ["Window W", P.W+" h"],
+  ["Min gap G", P.G+" h"], ["Sorties/period", P.N_srt],
+  ["Game value z*", D.zStar.toFixed(4)], ["Seed", D.seed]
+].map(([k,v])=>`<span>${k} <b class="mono">${v}</b></span>`).join("");
+
+const sel = document.getElementById("strat");
+D.strategies.forEach((s,i)=>{
+  const o=document.createElement("option"); o.value=i;
+  o.textContent = `${s.label}   (p = ${s.prob.toFixed(4)})`; sel.appendChild(o);
+});
+if(D.strategies.length===1) sel.disabled=true;
+
+const chips=document.getElementById("chips");
+TYPES.forEach(n=>{
+  const b=document.createElement("button");
+  b.className="chip"; b.setAttribute("aria-pressed","true"); b.dataset.t=n;
+  b.innerHTML=`<span class="sw" style="background:${colOf(n)}"></span>${n}`;
+  b.onclick=()=>{ S.hidden.has(n)?S.hidden.delete(n):S.hidden.add(n);
+    b.setAttribute("aria-pressed", String(!S.hidden.has(n))); draw(); fillTables(); };
+  chips.appendChild(b);
+});
+
+if(D.failures.length){
+  const el=document.getElementById("fails"); el.hidden=false;
+  el.innerHTML = "<b>Not schedulable with this seed:</b><br>" +
+    D.failures.map(f=>`${f.label} — the fleet flies at exactly its own sortie capacity, so a random phase draw can cluster more sorties into one ${P.G} h window than there are aircraft. Re-run with another seed.`).join("<br>");
+}
+
+/* ---------- rows ----------
+   Grouping is O(sorties) and is cached per (strategy, view): rebuilding it on
+   every mousemove would be O(rows x sorties) -- 152k comparisons a frame on a
+   92-aircraft instance. */
+let ROWS=null, rowsKey="";
+function buildRows(){
+  const st=D.strategies[S.si], bucket=new Map();
+  st.sorties.forEach((s,i)=>{
+    const k = S.view==="air" ? s.ac : s.type+"#"+s.bid;
+    let a=bucket.get(k); if(!a){a=[];bucket.set(k,a);}
+    a.push({s,i});
+  });
+  if(S.view==="air"){
+    ROWS = st.aircraft.map(a=>({key:a.name,label:a.name,type:null,
+                                items:bucket.get(a.name)||[]}));
+  }else{
+    ROWS = st.barriers.map(b=>({key:b.key,type:b.type,
+      label:b.key+"  P="+b.cov.toFixed(2), items:bucket.get(b.key)||[]}));
+  }
+  rowsKey = S.si+"|"+S.view;
+}
+function rows(){
+  if(rowsKey !== S.si+"|"+S.view) buildRows();
+  let out = ROWS;
+  if(S.view==="bar") out = out.filter(r=>!S.hidden.has(r.type));
+  if(S.find){ const q=S.find.toLowerCase();
+    out = out.filter(r=>r.label.toLowerCase().includes(q)); }
+  return out;
+}
+
+/* ---------- canvas ---------- */
+const cv=document.getElementById("stage"), cx=cv.getContext("2d");
+const LW=118, TOP=30, RH=20, PAD=12;
+let W=0,H=0,plotW=0,visRows=[];
+
+function layout(){
+  const r=rows(); visRows=r;
+  W=cv.parentElement.clientWidth;
+  H=Math.min(620, Math.max(120, TOP+r.length*RH+PAD));
+  const dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+"px"; cv.style.height=H+"px";
+  cx.setTransform(dpr,0,0,dpr,0,0);
+  plotW=W-LW-PAD;
+}
+const xOf = t => LW + (t-S.t0)/(S.t1-S.t0)*plotW;
+const tOf = x => S.t0 + (x-LW)/plotW*(S.t1-S.t0);
+
+function ticks(){
+  const span=S.t1-S.t0, target=Math.max(3,Math.floor(plotW/95));
+  const raw=span/target, mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const step=[1,2,2.5,5,10].map(m=>m*mag).find(v=>v>=raw)||10*mag;
+  const out=[]; for(let t=Math.ceil(S.t0/step)*step;t<=S.t1;t+=step) out.push(t);
+  return out;
+}
+
+function draw(){
+  layout();
+  const st=D.strategies[S.si];
+  cx.clearRect(0,0,W,H);
+  cx.fillStyle=css("--surface"); cx.fillRect(0,0,W,H);
+
+  cx.font='11px ui-monospace,Menlo,monospace'; cx.textBaseline="middle";
+  cx.strokeStyle=css("--rule-soft"); cx.lineWidth=1;
+  for(const t of ticks()){
+    const x=Math.round(xOf(t))+.5;
+    if(x<LW-1||x>W) continue;
+    cx.beginPath(); cx.moveTo(x,TOP-6); cx.lineTo(x,H); cx.stroke();
+    cx.fillStyle=css("--ink-3"); cx.textAlign="center";
+    cx.fillText(clock(t), x, TOP-16);
+  }
+  cx.strokeStyle=css("--rule"); cx.beginPath();
+  cx.moveTo(LW,TOP-6.5); cx.lineTo(W-PAD,TOP-6.5); cx.stroke();
+
+  const first=Math.max(0,Math.floor(S.scroll/RH));
+  const last=Math.min(visRows.length, first+Math.ceil((H-TOP)/RH)+1);
+
+  for(let i=first;i<last;i++){
+    const r=visRows[i], y=TOP+i*RH-S.scroll;
+    if(y+RH<TOP||y>H) continue;
+    if(i%2){ cx.fillStyle=css("--raised"); cx.fillRect(LW,y,W-LW-PAD,RH); }
+    cx.fillStyle=css("--ink-2"); cx.textAlign="right"; cx.font='11px ui-monospace,Menlo,monospace';
+    cx.fillText(r.label, LW-10, y+RH/2);
+
+    for(const {s,i:idx} of r.items){
+      if(S.hidden.has(s.type)) continue;
+      const dur = S.view==="air" ? P.tau_p : P.W;
+      const x1=xOf(s.t), x2=xOf(s.t+dur);
+      if(x2<LW||x1>W-PAD) continue;
+      const a=Math.max(LW,x1), b=Math.min(W-PAD,x2), w=Math.max(2,b-a);
+      cx.fillStyle=colOf(s.type);
+      cx.globalAlpha = (S.hot&&S.hot.idx===idx)?1:.92;
+      cx.beginPath(); cx.roundRect(a,y+3,w,RH-6,3); cx.fill();
+      cx.globalAlpha=1;
+      if(S.view==="bar" && x2-x1>6){
+        const pb=Math.min(W-PAD,xOf(s.t+P.tau_p));
+        cx.fillStyle=css("--ink"); cx.globalAlpha=.28;
+        cx.beginPath(); cx.roundRect(a,y+3,Math.max(1,pb-a),RH-6,3); cx.fill();
+        cx.globalAlpha=1;
+      }
+      if(w>34){
+        cx.fillStyle="#fff"; cx.textAlign="left"; cx.font='10px ui-monospace,Menlo,monospace';
+        const lbl = S.view==="air" ? s.type+"#"+s.bid : s.ac;
+        cx.save(); cx.beginPath(); cx.rect(a,y,w,RH); cx.clip();
+        cx.fillText(lbl, a+5, y+RH/2); cx.restore();
+      }
+      if(S.hot&&S.hot.idx===idx){
+        cx.strokeStyle=css("--ink"); cx.lineWidth=1.5;
+        cx.beginPath(); cx.roundRect(a,y+3,w,RH-6,3); cx.stroke();
+      }
+    }
+  }
+  document.getElementById("hint").textContent =
+    `${visRows.length} rows · window ${clock(S.t0)} → ${clock(S.t1)} (${(S.t1-S.t0).toFixed(1)} h of ${P.T} h) · `+
+    `+ / \u2212 or ctrl+wheel = zoom, drag = pan, double-click = reset` +
+    (visRows.length*RH > H-TOP ? " \u00b7 shift+wheel = scroll rows" : "");
+}
+
+function hit(mx,my){
+  const i=Math.floor((my+S.scroll-TOP)/RH);
+  if(i<0||i>=visRows.length) return null;
+  const r=visRows[i];
+  const dur = S.view==="air" ? P.tau_p : P.W;
+  for(const {s,i:idx} of r.items){
+    if(S.hidden.has(s.type)) continue;
+    const a=xOf(s.t), b=xOf(s.t+dur);
+    if(mx>=a-2&&mx<=b+2) return {s,idx,row:r};
+  }
+  return null;
+}
+
+const tip=document.getElementById("tip");
+cv.addEventListener("mousemove",e=>{
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  const h=hit(mx,my); const changed=(h&&h.idx)!==(S.hot&&S.hot.idx);
+  S.hot=h;
+  if(h){
+    const s=h.s;
+    tip.innerHTML=`<div class="th"><span class="sw" style="background:${colOf(s.type)}"></span>${s.type}#${s.bid}</div>`+
+      `<dl><dt>Aircraft</dt><dd class="mono">${s.ac}</dd>`+
+      `<dt>Depart</dt><dd class="mono">${clock(s.t)}</dd>`+
+      `<dt>Land</dt><dd class="mono">${clock(s.t+P.tau_p)}</dd>`+
+      `<dt>Protected until</dt><dd class="mono">${clock(s.t+P.W)}</dd>`+
+      `<dt>t</dt><dd class="mono">${hrs(s.t)}</dd></dl>`;
+    tip.style.opacity=1;
+    const tw=tip.offsetWidth, th=tip.offsetHeight;
+    tip.style.left=Math.min(window.innerWidth-tw-8, e.clientX+14)+"px";
+    tip.style.top=Math.max(8, e.clientY-th-12)+"px";
+  } else tip.style.opacity=0;
+  if(changed) draw();
+});
+cv.addEventListener("mouseleave",()=>{tip.style.opacity=0;S.hot=null;draw();});
+
+cv.addEventListener("wheel",e=>{
+  // Only claim the wheel for an explicit zoom gesture. A plain wheel belongs to
+  // the page: this viewer is embedded, and swallowing scroll meant the chart
+  // quietly zoomed itself whenever the pointer crossed it.
+  if(!(e.ctrlKey||e.metaKey||e.shiftKey)) return;
+  e.preventDefault();
+  if(e.shiftKey){
+    const max=Math.max(0,visRows.length*RH-(H-TOP));
+    S.scroll=Math.max(0,Math.min(max,S.scroll+e.deltaY)); draw(); return;
+  }
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left;
+  if(mx<LW) return;
+  const anchor=tOf(mx), k=e.deltaY>0?1.18:1/1.18;
+  let a=anchor-(anchor-S.t0)*k, b=anchor+(S.t1-anchor)*k;
+  if(b-a>P.T){a=0;b=P.T;}
+  if(b-a<P.tau_p/4) return;
+  S.t0=Math.max(0,a); S.t1=Math.min(P.T,b);
+  if(S.t1-S.t0<1e-9){S.t0=0;S.t1=P.T;}
+  draw();
+},{passive:false});
+
+let drag=null;
+cv.addEventListener("pointerdown",e=>{
+  drag={x:e.clientX,y:e.clientY,t0:S.t0,t1:S.t1,sc:S.scroll};
+  cv.classList.add("drag"); cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  const span=drag.t1-drag.t0, dt=-(e.clientX-drag.x)/plotW*span;
+  let a=drag.t0+dt, b=drag.t1+dt;
+  if(a<0){b-=a;a=0;} if(b>P.T){a-=(b-P.T);b=P.T;}
+  S.t0=Math.max(0,a); S.t1=Math.min(P.T,b);
+  const max=Math.max(0,visRows.length*RH-(H-TOP));
+  S.scroll=Math.max(0,Math.min(max,drag.sc-(e.clientY-drag.y)));
+  draw();
+});
+["pointerup","pointercancel"].forEach(ev=>cv.addEventListener(ev,e=>{
+  drag=null; cv.classList.remove("drag");
+}));
+cv.addEventListener("dblclick",()=>{S.t0=0;S.t1=P.T;S.scroll=0;draw();});
+
+function zoomBy(k){
+  const c=(S.t0+S.t1)/2; let half=(S.t1-S.t0)*k/2;
+  if(half*2>P.T){S.t0=0;S.t1=P.T;draw();return;}
+  if(half*2<P.tau_p/4) return;
+  let a=c-half,b=c+half;
+  if(a<0){b-=a;a=0;} if(b>P.T){a-=(b-P.T);b=P.T;}
+  S.t0=Math.max(0,a);S.t1=Math.min(P.T,b);draw();
+}
+document.getElementById("zoomIn").onclick=()=>zoomBy(1/1.4);
+document.getElementById("zoomOut").onclick=()=>zoomBy(1.4);
+document.getElementById("reset").onclick=()=>{S.t0=0;S.t1=P.T;S.scroll=0;draw();};
+sel.onchange=()=>{S.si=+sel.value;S.scroll=0;rowsKey="";draw();fillTables();};
+document.getElementById("find").oninput=e=>{S.find=e.target.value.trim();S.scroll=0;draw();};
+function setView(v){
+  S.view=v; S.scroll=0;
+  document.getElementById("vAir").setAttribute("aria-pressed",String(v==="air"));
+  document.getElementById("vBar").setAttribute("aria-pressed",String(v==="bar"));
+  draw();
+}
+document.getElementById("vAir").onclick=()=>setView("air");
+document.getElementById("vBar").onclick=()=>setView("bar");
+window.addEventListener("resize",draw);
+matchMedia("(prefers-color-scheme:dark)").addEventListener("change",draw);
+
+/* ---------- tables (also the relief for low-contrast fills) ---------- */
+function fillTables(){
+  const st=D.strategies[S.si];
+  const tb=document.querySelector("#tbl tbody"); tb.innerHTML="";
+  st.sorties.forEach((s,i)=>{
+    if(S.hidden.has(s.type)) return;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td class="r mono">${i+1}</td>`+
+      `<td><span class="dot" style="background:${colOf(s.type)}"></span>${s.type}#${s.bid}</td>`+
+      `<td class="mono">${s.ac}</td><td class="r mono">${clock(s.t)}</td>`+
+      `<td class="r mono">${clock(s.t+P.tau_p)}</td><td class="r mono">${clock(s.t+P.W)}</td>`+
+      `<td class="r mono">${s.t.toFixed(2)}</td>`;
+    tb.appendChild(tr);
+  });
+  const ab=document.querySelector("#atbl tbody"); ab.innerHTML="";
+  st.aircraft.forEach(a=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td class="mono">${a.name}</td><td class="r mono">${a.n}</td>`+
+      `<td class="r mono">${a.hours.toFixed(2)}</td><td class="r mono">${P.F.toFixed(2)}</td>`+
+      `<td class="r mono">${a.minGap==null?"—":a.minGap.toFixed(2)}</td>`+
+      `<td class="r mono">${a.wrap.toFixed(2)}</td>`;
+    ab.appendChild(tr);
+  });
+}
+fillTables(); draw();
+</script>
+
+
+</body></html>

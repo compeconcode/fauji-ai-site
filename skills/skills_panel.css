@@ -1,0 +1,41 @@
+/* Side panel for the fauji.ai skills (loaded by chatbot_v3.html). Everything is namespaced
+   with #sidePanel / .sp- so it cannot clash with the chat page's own styles. */
+
+#topRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+#skillsBtn { border: 1px solid #1a5c3f; background: white; color: #1a5c3f; border-radius: 8px;
+             padding: 6px 12px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+#skillsBtn:hover { background: #eef6f1; }
+#layout.open #skillsBtn { background: #1a5c3f; color: white; }
+
+/* when the panel is open the chat column shares the row with it */
+#layout.open #chatCol { margin: 0; max-width: none; flex: 1 1 0; min-width: 300px; }
+#layout.chat-hidden #chatCol { display: none; }
+
+#spDivider { flex: none; width: 8px; cursor: col-resize; background: #e4e4e4; touch-action: none; }
+#spDivider:hover, #spDivider.drag { background: #1a5c3f; }
+#spDivider[hidden], #sidePanel[hidden] { display: none; }
+
+#sidePanel { flex: none; width: var(--spw, 46vw); min-width: 300px; height: 100vh; box-sizing: border-box;
+             display: flex; flex-direction: column; background: #fff; }
+#layout.chat-hidden #sidePanel { flex: 1 1 auto; width: auto; }
+#layout.dragging iframe { pointer-events: none; }      /* keep the mouse while dragging over the pages */
+
+.sp-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #ddd;
+           background: #fafafa; font-size: 13px; }
+.sp-head label { color: #555; }
+.sp-head select { font: inherit; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; background: white; }
+.sp-head .sp-grow { flex: 1; }
+.sp-head button { border: 1px solid #ddd; background: white; border-radius: 6px; padding: 4px 9px;
+                  font-size: 13px; cursor: pointer; color: #555; }
+.sp-head button:hover { background: #f0f0f0; }
+
+.sp-sec { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; border-bottom: 1px solid #ddd; }
+.sp-sec.collapsed { flex: 0 0 auto; }
+.sp-sechead { text-align: left; border: none; background: #f4f4f4; padding: 8px 12px; font-size: 13px;
+              font-weight: 600; color: #333; cursor: pointer; }
+.sp-sechead:hover { background: #ececec; }
+.sp-secbody { flex: 1 1 auto; min-height: 0; position: relative; }
+.sp-sec.collapsed .sp-secbody { display: none; }
+.sp-secbody iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.sp-secbody iframe[hidden] { display: none; }
+#resultEmpty { padding: 16px; font-size: 13px; color: #777; }

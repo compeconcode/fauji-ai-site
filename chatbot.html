@@ -5,8 +5,10 @@
 <title>fauji.ai: AI assistant who speaks Indian Armed Forces language</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
 <style>
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 auto; max-width: 760px;
-         padding: 24px; color: #1a1a1a; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; color: #1a1a1a; }
+  #layout { display: flex; height: 100vh; }
+  #chatCol { flex: 1 1 auto; max-width: 760px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column;
+             height: 100vh; box-sizing: border-box; min-width: 0; }
   h1 { font-size: 20px; margin: 0 0 4px; }
   p.sub { color: #555; margin: 0 0 16px; font-size: 13px; }
 
@@ -60,10 +62,17 @@
   .notice { font-size: 12px; color: #b45309; margin-top: 6px; }
   .notice:empty { display: none; }
 </style>
+<link rel="stylesheet" href="skills/skills_panel.css">
 </head>
 <body>
 
+<div id="layout">
+<div id="chatCol">
+
+<div id="topRow">
 <h1>fauji.ai: AI assistant who speaks Indian Armed Forces language</h1>
+<button id="skillsBtn" title="Open the skills panel (patrol planner)">Skills</button>
+</div>
 <p class="sub">Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs to flag good or bad answers, that feedback is saved for review. Use the paperclip to attach a PDF, DOCX or TXT file (up to 3 files, 20 MB each): your questions are then answered from your file as well. The file is kept only for this chat session. This is a public demo: do not attach sensitive or classified documents.</p>
 
 <div id="chatWindow"></div>
@@ -78,6 +87,33 @@
   <button id="sendBtn" onclick="sendMessage()">Send</button>
   <button id="stopBtn" onclick="stopStreaming()" disabled>Stop</button>
 </div>
+
+</div><!-- /chatCol -->
+
+<div id="spDivider" role="separator" aria-orientation="vertical" title="Drag to resize" hidden></div>
+<aside id="sidePanel" hidden>
+  <div class="sp-head">
+    <label for="skillSelect">Skill</label>
+    <select id="skillSelect">
+      <option value="patrol_planning">Patrol planner</option>
+    </select>
+    <span class="sp-grow"></span>
+    <button id="spChatToggle" title="Hide or show the chat">Hide chat</button>
+    <button id="spClose" title="Close the panel">&#10005;</button>
+  </div>
+  <section class="sp-sec" id="secInputs">
+    <button class="sp-sechead" aria-expanded="true">&#9662; Inputs</button>
+    <div class="sp-secbody"><iframe id="formFrame" src="skills/patrol_form.html" title="Patrol planner inputs"></iframe></div>
+  </section>
+  <section class="sp-sec" id="secResult">
+    <button class="sp-sechead" aria-expanded="true">&#9662; Result</button>
+    <div class="sp-secbody">
+      <div id="resultEmpty">No result yet. Fill in the inputs and press Generate timetable.</div>
+      <iframe id="resultFrame" title="Patrol timetable" hidden></iframe>
+    </div>
+  </section>
+</aside>
+</div><!-- /layout -->
 
 <script>
 // Fill in the URL Cloudflare Tunnel gives you for THIS server (port 8001 on
@@ -410,6 +446,7 @@ async function vote_(index, turnId, voteValue, upBtn, downBtn) {
   }
 }
 </script>
+<script src="skills/skills_panel.js"></script>
 
 </body>
 </html>

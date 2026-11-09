@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Patrol Planner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312507E'/%3E%3Cg fill='%23fff'%3E%3Crect x='6' y='9' width='7' height='4' rx='2'/%3E%3Crect x='17' y='14' width='9' height='4' rx='2'/%3E%3Crect x='6' y='19' width='12' height='4' rx='2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="patrol_style.css">
+</head>
+<body>
+<div class="wrap narrow">
+
+  <p class="lead">Enter the fleet and the areas to be covered, then generate the timetable.</p>
+
+  
+  <div id="errBox" class="msg err hidden"><b id="errWhere">Problem</b><span id="errMsg"></span></div>
+
+  <form id="form" class="card" autocomplete="off">
+    <h2>Inputs</h2>
+    <div class="body" style="display:flex;flex-direction:column;gap:20px">
+
+      <fieldset>
+        <div class="grid">
+          <div class="f">
+            <label for="N">Aircraft in the fleet</label>
+            <input type="number" id="N" min="1" step="1" value="2" required="">
+            <span class="hint">How many airframes are available.</span>
+          </div>
+          <div class="f">
+            <label for="F">Flying hours per aircraft</label>
+            <input type="number" id="F" min="0" step="any" value="6" required="">
+            <span class="hint">Per planning period, per aircraft.</span>
+          </div>
+          <div class="f">
+            <label for="T">Planning period (hours)</label>
+            <input type="number" id="T" min="0" step="any" value="24" required="">
+            <span class="hint">24 for a day, 720 for a month. The schedule repeats.</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="grid">
+          <div class="f">
+            <label for="tau_p">Patrol duration (hours)</label>
+            <input type="number" id="tau_p" min="0" step="any" value="2" required="">
+            <span class="hint">Flying hours consumed by one patrol.</span>
+          </div>
+          <div class="f">
+            <label for="tau_s">Secure period after a patrol (hours)</label>
+            <input type="number" id="tau_s" min="0" step="any" value="4" required="">
+            <span class="hint">How long an area stays covered once a patrol ends.</span>
+          </div>
+          <div class="f">
+            <label for="tau_r">Turnaround (hours)</label>
+            <input type="number" id="tau_r" min="0" step="any" value="4" required="">
+            <span class="hint">Minimum rest before the same aircraft flies again.</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="f" style="margin-bottom:10px">
+          <label>Areas to cover</label>
+          <span class="hint">Value is relative importance — only the ratios between areas matter.</span>
+        </div>
+        <div class="areas" id="areas">
+          <div class="arow hdr"><span>Name</span><span>How many</span><span>Value</span><span></span></div></div>
+        <button type="button" id="addArea" style="margin-top:10px">+ Add area</button>
+      </fieldset>
+
+      <fieldset>
+        <div class="grid">
+          <div class="f" style="max-width:220px">
+            <label for="seed">Randomisation seed</label>
+            <input type="number" id="seed" step="1" value="0">
+            <span class="hint">Start times are drawn at random. Change this for a different draw.</span>
+          </div>
+        </div>
+      </fieldset>
+
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary" id="go">Generate timetable</button>
+      <button type="button" id="example">Load example</button>
+      <span class="sp"></span>
+      <button type="button" id="reset">Clear</button>
+    </div>
+  </form>
+
+  <footer>The timetable is calculated on the fauji.ai server.</footer>
+</div>
+
+<script src="patrol_form.js"></script>
+
+
+</body></html>
