@@ -39,3 +39,21 @@
 .sp-secbody iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .sp-secbody iframe[hidden] { display: none; }
 #resultEmpty { padding: 16px; font-size: 13px; color: #777; }
+
+/* guide text (in the panel's Guide section and in the "Open the planner?" question) */
+.sp-guide-text { font-size: 13px; line-height: 1.5; color: #333; }
+.sp-guide-text h4 { margin: 10px 0 3px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #1a5c3f; }
+.sp-guide-text h4:first-child { margin-top: 0; }
+.sp-guide-text p { margin: 0 0 4px; }
+.sp-guide-text ul, .sp-guide-text ol { margin: 0 0 4px; padding-left: 20px; }
+.sp-guide-text li { margin-bottom: 2px; }
+.sp-guide-text .sp-assume { color: #666; font-style: italic; margin-top: 6px; }
+.sp-guide { overflow-y: auto; padding: 10px 14px; }
+
+#skillOffer { margin-top: 10px; border: 1px solid #1a5c3f; border-radius: 10px; background: #f3faf6; padding: 10px 12px;
+              max-height: 42vh; overflow-y: auto; }
+#skillOffer .sp-offer-q { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+#skillOffer .sp-offer-btns { display: flex; gap: 8px; margin: 0 0 10px; }
+#skillOffer button { border: 1px solid #1a5c3f; background: white; color: #1a5c3f; border-radius: 8px; padding: 6px 12px;
+                     font-size: 13px; cursor: pointer; }
+#skillOffer button.sp-yes { background: #1a5c3f; color: white; }

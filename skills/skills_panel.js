@@ -10,7 +10,12 @@
         (re)loaded: it reads the plan from there. On an error the message goes back to the form.
    Nothing here loads from the internet; all files are relative to this page.
 
-   To add a second skill later: add an <option> to #skillSelect and its own form/result pages. */
+   Routing: before a typed message goes to /chat, the page asks POST /skills/route which skill (if any) the
+   message needs. For a skill the chat shows a guide + "Open the planner?" and waits for a click; for "none",
+   or if the server does not answer within 5 s, the message is sent to /chat exactly as before.
+
+   To add a second skill later: add an <option> to #skillSelect, its guide text to GUIDES, and its own
+   form/result pages. */
 
 (function () {
   const SKILL_URL = CHAT_URL.replace(/\/chat$/, "/skills/patrol_planning/run");   // follows CHAT_URL, like UPLOAD_URL
@@ -143,4 +148,110 @@
     const m = e.data;
     if (m && m.type === "patrol-solve" && m.spec) runPatrol(m.spec);
   });
+
+  /* ---------- guide text (fixed text, shown in the panel and in the "Open the planner?" question) ---------- */
+  const GUIDES = {
+    patrol_planning: {
+      title: "Patrol planner",
+      what: "Plans patrol sorties for a fleet of aircraft that guard a set of areas. More valuable areas are patrolled more often. " +
+            "The plan covers one planning period (for example 24 hours) and repeats.",
+      how: [
+        "Step 1: decides how many of the fleet's flying hours each kind of area gets, favouring the more valuable ones.",
+        "Step 2: turns those hours into whole numbers of patrols. Sometimes the answer is a mix of two plans, each with a probability.",
+        "Step 3: builds the timetable. Start times are drawn at random so the pattern is hard to predict, and every patrol is given an aircraft that has the flying hours and rest time for it."
+      ],
+      inputs: [
+        "Aircraft in the fleet: how many are available.",
+        "Flying hours per aircraft: per planning period.",
+        "Planning period: in hours (24 = one day).",
+        "Patrol duration: flying hours used by one patrol.",
+        "Secure period after a patrol: how long an area stays covered once a patrol ends.",
+        "Turnaround: the minimum rest before the same aircraft flies again.",
+        "Areas to cover: a name, how many of that kind, and a value. Only the ratios between the values matter.",
+        "Randomisation seed (optional): change it to get a different random draw of start times."
+      ],
+      assumptions: "Assumptions: the aircraft are identical, areas of the same kind are identical, and travel time is not counted."
+    }
+  };
+
+  function guideNode(g) {
+    const box = document.createElement("div");
+    box.className = "sp-guide-text";
+    const add = (tag, text, parent) => { const e = document.createElement(tag); e.textContent = text; (parent || box).appendChild(e); return e; };
+    const list = (items, tag) => { const l = document.createElement(tag || "ul"); items.forEach(t => add("li", t, l)); box.appendChild(l); };
+    add("h4", "What it does");  add("p", g.what);
+    add("h4", "How it works");  list(g.how, "ol");
+    add("h4", "What you need to provide"); list(g.inputs);
+    add("p", g.assumptions).className = "sp-assume";
+    return box;
+  }
+  $("guideBody").appendChild(guideNode(GUIDES.patrol_planning));
+
+  /* ---------- routing: ask the server which skill a typed message needs ---------- */
+  const ROUTE_URL = CHAT_URL.replace(/\/chat$/, "/skills/route");
+  const ROUTE_TIMEOUT_MS = 5000;
+  let offerBox = null, routing = false;
+
+  function hideOffer() { if (offerBox) { offerBox.remove(); offerBox = null; } }
+
+  async function askRouter(text) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ROUTE_TIMEOUT_MS);
+    try {
+      const r = await fetch(ROUTE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+        body: JSON.stringify({ message: text }),
+        signal: ctrl.signal
+      });
+      if (!r.ok) return "none";
+      const j = await r.json();
+      return (j && typeof j.skill === "string") ? j.skill : "none";
+    } catch (e) {
+      return "none";                       // server unreachable or too slow: just answer normally
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function showOffer(skill) {
+    hideOffer();
+    offerBox = document.createElement("div");
+    offerBox.id = "skillOffer";
+    const q = document.createElement("div");
+    q.className = "sp-offer-q";
+    q.textContent = "This looks like a patrol-planning problem. Open the planner?";
+    const row = document.createElement("div");
+    row.className = "sp-offer-btns";
+    const yes = document.createElement("button"); yes.textContent = "Open planner"; yes.className = "sp-yes";
+    const no = document.createElement("button");  no.textContent = "No, just answer";
+    row.appendChild(yes); row.appendChild(no);
+    offerBox.appendChild(q);
+    offerBox.appendChild(row);                       // buttons right under the question, the guide below them
+    offerBox.appendChild(guideNode(GUIDES[skill]));
+    $("docChips").parentNode.insertBefore(offerBox, $("docChips"));
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    yes.onclick = () => {
+      hideOffer();
+      promptInput.value = "";
+      status.textContent = "Patrol planner opened.";
+      if (panel.hidden) openPanel();
+    };
+    no.onclick = () => { hideOffer(); originalSend(); };       // the typed text is still in the box
+  }
+
+  // Wrap the chat page's own sendMessage(). The Send button and the Enter key call it by name,
+  // so both go through this. The original function is kept and called unchanged.
+  const originalSend = sendMessage;
+  sendMessage = async function () {
+    if (routing) return;
+    hideOffer();
+    const text = promptInput.value.trim();
+    if (!text || sendBtn.disabled) return originalSend();      // empty box, or an answer is still streaming
+    routing = true;
+    let skill = "none";
+    try { skill = await askRouter(text); } finally { routing = false; }
+    if (GUIDES[skill]) { showOffer(skill); return; }
+    return originalSend();
+  };
 })();
