@@ -14,12 +14,19 @@
    message needs. For a skill the chat shows a guide + "Open the planner?" and waits for a click; for "none",
    or if the server does not answer within 5 s, the message is sent to /chat exactly as before.
 
+   Plan in the chat: after a successful run the plan is described as text (patrol_plan_text.js) and a chip above the
+   typing box says "Patrol plan attached". While attached, every question goes straight to /chat (the router is
+   skipped) with that text in "plan_context", so the model answers from the plan's real numbers. The chip's x detaches the plan (the text is
+   kept; "Attach again" brings it back); "Explain this plan" sends a ready-made question.
+
    To add a second skill later: add an <option> to #skillSelect, its guide text to GUIDES, and its own
    form/result pages. */
 
 (function () {
   const SKILL_URL = CHAT_URL.replace(/\/chat$/, "/skills/patrol_planning/run");   // follows CHAT_URL, like UPLOAD_URL
   const PLAN_KEY = "patrolPlan";           // read by patrol_timetable.html
+  const PLAN_TEXT_KEY = "patrolPlanText";  // the plan described as text, for the chat
+  const PLAN_ATTACHED_KEY = "patrolPlanAttached";
   const WIDTH_KEY = "fauji.panelWidth";
   const MIN_PANEL = 320, MIN_CHAT = 300;
 
@@ -141,6 +148,8 @@
     }
     showResult(true);
     replyToForm({ ok: true });
+    try { setPlanText(window.patrolPlanText(spec, res.summary, res.payload)); }       // the timetable works even if this fails
+    catch (e) { console.warn("plan description failed", e); }
   }
 
   window.addEventListener("message", e => {
@@ -148,6 +157,53 @@
     const m = e.data;
     if (m && m.type === "patrol-solve" && m.spec) runPatrol(m.spec);
   });
+
+  /* ---------- the plan inside the chat: chip + text sent with each question ---------- */
+  let planText = "", planAttached = false, planChip = null;
+  try {
+    planText = sessionStorage.getItem(PLAN_TEXT_KEY) || "";
+    planAttached = !!planText && sessionStorage.getItem(PLAN_ATTACHED_KEY) !== "0";
+  } catch (e) {}
+
+  // called by chatbot_v3.html for every question: the text to send, or "" when no plan is attached
+  window.currentPlanContext = () => (planText && planAttached ? planText : "");
+
+  function savePlanState() {
+    try { sessionStorage.setItem(PLAN_TEXT_KEY, planText); sessionStorage.setItem(PLAN_ATTACHED_KEY, planAttached ? "1" : "0"); }
+    catch (e) {}
+  }
+  function setPlanText(text) { planText = text; planAttached = true; savePlanState(); renderPlanChip(); }
+
+  const EXPLAIN_QUESTION = "Explain this patrol plan: what it does, why the areas get different numbers of patrols, " +
+                           "and how to read the timetable.";
+
+  function renderPlanChip() {
+    if (planChip) { planChip.remove(); planChip = null; }
+    if (!planText) return;
+    planChip = document.createElement("div");
+    planChip.id = "planChip";
+    planChip.className = "chip" + (planAttached ? "" : " sp-detached");
+    const label = document.createElement("span");
+    label.textContent = planAttached ? "Patrol plan attached" : "Patrol plan not attached";
+    planChip.appendChild(label);
+    const btn = (text, title, fn, cls) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = text; b.title = title; b.className = cls || "sp-chip-btn"; b.onclick = fn;
+      planChip.appendChild(b);
+    };
+    if (planAttached) {
+      btn("Explain this plan", "Ask the chat to explain the plan", () => {
+        if (sendBtn.disabled) return;                       // an answer is still streaming
+        promptInput.value = EXPLAIN_QUESTION;
+        originalSend();                                     // no routing check: this question is about the plan
+      });
+      btn("×", "Stop sending the plan with my questions", () => { planAttached = false; savePlanState(); renderPlanChip(); }, "x");
+    } else {
+      btn("Attach again", "Send the plan with my questions again", () => { planAttached = true; savePlanState(); renderPlanChip(); });
+    }
+    $("docChips").parentNode.insertBefore(planChip, $("docChips"));
+  }
+  renderPlanChip();
 
   /* ---------- guide text (fixed text, shown in the panel and in the "Open the planner?" question) ---------- */
   const GUIDES = {
@@ -170,7 +226,9 @@
         "Areas to cover: a name, how many of that kind, and a value. Only the ratios between the values matter.",
         "Randomisation seed (optional): change it to get a different random draw of start times."
       ],
-      assumptions: "Assumptions: the aircraft are identical, areas of the same kind are identical, and travel time is not counted."
+      assumptions: "Assumptions: the aircraft are identical, areas of the same kind are identical, and travel time is not counted.",
+      after: "After you generate a plan you can ask the chat questions about it, for example why an area gets more patrols or when an aircraft flies. " +
+             "The answers use the numbers from your plan. To ask something unrelated, or to plan again for a different fleet, click the \u00d7 next to \u201cPatrol plan attached\u201d above the message box."
     }
   };
 
@@ -183,6 +241,7 @@
     add("h4", "How it works");  list(g.how, "ol");
     add("h4", "What you need to provide"); list(g.inputs);
     add("p", g.assumptions).className = "sp-assume";
+    if (g.after) add("h4", "After the plan is made"), add("p", g.after);
     return box;
   }
   $("guideBody").appendChild(guideNode(GUIDES.patrol_planning));
@@ -248,6 +307,7 @@
     hideOffer();
     const text = promptInput.value.trim();
     if (!text || sendBtn.disabled) return originalSend();      // empty box, or an answer is still streaming
+    if (window.currentPlanContext()) return originalSend();    // a plan is attached: the question is about it, no routing
     routing = true;
     let skill = "none";
     try { skill = await askRouter(text); } finally { routing = false; }

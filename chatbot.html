@@ -269,7 +269,8 @@ async function streamAssistantReply() {
   const responseDiv = document.querySelector(`#msg-${placeholderIndex} .response`);
 
   const docIds = docs.filter(d => d.doc_id && !d.busy).map(d => d.doc_id);
-  messages[placeholderIndex].with_doc = docIds.length > 0;
+  const planText = (window.currentPlanContext && window.currentPlanContext()) || "";   // attached patrol plan (skills/skills_panel.js)
+  messages[placeholderIndex].with_doc = docIds.length > 0 || !!planText;               // such turns are kept out of the logs
 
   try {
     const resp = await fetch(CHAT_URL, {
@@ -277,7 +278,8 @@ async function streamAssistantReply() {
       headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
       body: JSON.stringify({
         messages: messages.slice(0, placeholderIndex).map(m => ({ role: m.role, content: m.content })),
-        ...(docIds.length ? { session_id: SESSION_ID, doc_ids: docIds } : {})
+        ...(docIds.length ? { session_id: SESSION_ID, doc_ids: docIds } : {}),
+        ...(planText ? { plan_context: planText } : {})
       }),
       signal: currentController.signal
     });
@@ -469,6 +471,7 @@ async function vote_(index, turnId, voteValue, upBtn, downBtn) {
   }
 }
 </script>
+<script src="skills/patrol_plan_text.js"></script>
 <script src="skills/skills_panel.js"></script>
 
 </body>

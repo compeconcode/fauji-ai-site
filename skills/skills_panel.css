@@ -57,3 +57,10 @@
 #skillOffer button { border: 1px solid #1a5c3f; background: white; color: #1a5c3f; border-radius: 8px; padding: 6px 12px;
                      font-size: 13px; cursor: pointer; }
 #skillOffer button.sp-yes { background: #1a5c3f; color: white; }
+
+/* chip for the attached patrol plan (the base .chip look comes from chatbot_v3.html) */
+#planChip { margin-top: 10px; width: fit-content; }
+#planChip.sp-detached { background: #f4f4f4; border-color: #aaa; color: #666; }
+#planChip .sp-chip-btn { border: 1px solid #1a5c3f; background: white; color: #1a5c3f; border-radius: 6px;
+                         padding: 2px 8px; font-size: 12px; cursor: pointer; }
+#planChip .sp-chip-btn:hover { background: #eef6f1; }
