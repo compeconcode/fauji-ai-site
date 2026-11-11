@@ -209,25 +209,33 @@
   const GUIDES = {
     patrol_planning: {
       title: "Patrol planner",
-      what: "Plans patrol sorties for a fleet of aircraft that guard a set of areas. More valuable areas are patrolled more often. " +
-            "The plan covers one planning period (for example 24 hours) and repeats.",
+      what: "Plans patrol sorties for a fleet of aircraft that guard a set of areas, over one planning period (for example 24 hours) that then repeats. " +
+            "The planner is built on a Stackelberg game: you commit to a randomised patrol plan, and an adversary then strikes wherever you are weakest. " +
+            "It looks for the plan that makes that worst case as good as it can be.",
       how: [
-        "Step 1: decides how many of the fleet's flying hours each kind of area gets, favouring the more valuable ones.",
-        "Step 2: turns those hours into whole numbers of patrols. Sometimes the answer is a mix of two plans, each with a probability.",
-        "Step 3: builds the timetable. Start times are drawn at random so the pattern is hard to predict, and every patrol is given an aircraft that has the flying hours and rest time for it."
+        "Step 1: splits the fleet's flying hours between the kinds of area so that the worst case is as good as possible. The most valuable area does not automatically get the most patrols, because the split is set by that worst-case rule and not by value alone.",
+        "Step 2: turns each share of hours into patrols. When a share is not a whole number of patrols (say 2.5), the planner offers several plans, rounding down in some and up in others, each with a probability, so that on average the share is met.",
+        "Step 3: builds a timetable for each plan. Start times are drawn at random so the pattern is hard to predict, and each patrol is given an aircraft that has flying hours left and has had its turnaround rest."
+      ],
+      read: [
+        "Coverage: the chance that an area is protected at a given moment. A patrol protects its area for the patrol time plus the secure period that follows.",
+        "Patrol interval: the planning period divided by the number of patrols.",
+        "Longest unwatched stretch: the longest an area could go without protection if the random start times fall badly.",
+        "Game value: the worst case the planner could reach. Higher is better, and 0 means break-even.",
+        "Plans: the hours, patrols and coverage per area are averages over the plans. Use the Plan menu above the chart to look at each plan."
       ],
       inputs: [
-        "Aircraft in the fleet: how many are available.",
-        "Flying hours per aircraft: per planning period.",
-        "Planning period: in hours (24 = one day).",
-        "Patrol duration: flying hours used by one patrol.",
-        "Secure period after a patrol: how long an area stays covered once a patrol ends.",
-        "Turnaround: the minimum rest before the same aircraft flies again.",
-        "Areas to cover: a name, how many of that kind, and a value. Only the ratios between the values matter.",
-        "Randomisation seed (optional): change it to get a different random draw of start times."
+        "Aircraft in the fleet: how many airframes are available.",
+        "Flying hours per aircraft: per planning period, per aircraft.",
+        "Planning period (hours): 24 for a day, 720 for a month. The schedule repeats.",
+        "Patrol duration (hours): flying hours consumed by one patrol.",
+        "Secure period after a patrol (hours): how long an area stays covered once a patrol ends.",
+        "Turnaround (hours): minimum rest before the same aircraft flies again.",
+        "Areas to cover: a name, how many of that kind, and a value. The value is relative importance; only the ratios between areas matter.",
+        "Randomisation seed (optional): start times are drawn at random, change this for a different draw."
       ],
-      assumptions: "Assumptions: the aircraft are identical, areas of the same kind are identical, and travel time is not counted.",
-      after: "After you generate a plan you can ask the chat questions about it, for example why an area gets more patrols or when an aircraft flies. " +
+      assumptions: "Note: the form has one value of flying hours for all aircraft, and no travel time between bases and areas.",
+      after: "After you generate a plan you can ask the chat questions about it, for example how many patrols an area gets or when an aircraft flies. " +
              "The answers use the numbers from your plan. To ask something unrelated, or to plan again for a different fleet, click the \u00d7 next to \u201cPatrol plan attached\u201d above the message box."
     }
   };
@@ -239,6 +247,7 @@
     const list = (items, tag) => { const l = document.createElement(tag || "ul"); items.forEach(t => add("li", t, l)); box.appendChild(l); };
     add("h4", "What it does");  add("p", g.what);
     add("h4", "How it works");  list(g.how, "ol");
+    if (g.read) { add("h4", "Reading the results"); list(g.read); }
     add("h4", "What you need to provide"); list(g.inputs);
     add("p", g.assumptions).className = "sp-assume";
     if (g.after) add("h4", "After the plan is made"), add("p", g.after);

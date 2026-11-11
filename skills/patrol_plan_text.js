@@ -41,9 +41,26 @@
     }
     L.push("");
 
-    L.push("Game value z*: " + num(sm.zStar) +
-           " (for every area kind that gets patrols, value x (2 x coverage - 1) comes out at this number).");
-    L.push("Flying-hour allocation per kind of area (all areas of the kind together, per planning period):");
+    L.push("How the planner works:");
+    L.push("- It treats the task as a game. The air force commits to a randomised patrol plan, and an adversary then strikes " +
+           "the kind of area where the air force does worst. The planner chooses the split of flying hours that makes this " +
+           "worst case as good as possible. The game value z* is that worst case: higher is better, and 0 is break-even.");
+    L.push("- Coverage is the chance that an area is protected at a given moment. A patrol protects its area for the patrol " +
+           "time plus the secure period after it.");
+    L.push("- Each kind of area gets a score: value x (2 x coverage - 1). Coverage 0.5 scores 0. The planner splits the hours " +
+           "so that every kind of area that gets patrols has the same score (kinds left without patrols, or already at the " +
+           "most coverage they can physically get, are the exceptions). So a more valuable area does not automatically get " +
+           "more patrols: when the game value is positive, the more valuable kind needs less coverage to reach the same score, " +
+           "and when it is negative it needs more.");
+    L.push("- Flying hours divided by the patrol duration give the number of patrols. This can be fractional (for example 2.5), " +
+           "so the planner offers several plans that round down or up, each with a probability, so that on average the " +
+           "allocation is met. The allocation figures below are those averages.");
+    L.push("- Start times are drawn at random so the pattern is hard to predict. Each patrol is given an aircraft that has " +
+           "flying hours left and has had its turnaround rest.");
+    L.push("");
+
+    L.push("Game value z*: " + num(sm.zStar));
+    L.push("Flying-hour allocation per kind of area, per planning period (averages over the plans below, so they can be fractional):");
     (sm.allocation || []).forEach(a => {
       if (!a.active) {
         L.push("- " + a.name + ": no flying hours and no patrols (see the notes below).");
@@ -52,31 +69,28 @@
       L.push("- " + a.name + ": " + num(a.hours) + " flying hours, " + num(a.patrols) + " patrols" +
              (a.interval ? " (one every " + num(a.interval) + " h)" : "") +
              ", coverage " + num(a.coverage) +
-             (a.worstGap ? ", longest unwatched stretch " + num(a.worstGap) + " h" : "") +
-             ", value x (2 x coverage - 1) = " + num(a.ud));
+             (a.worstGap ? ", longest unwatched stretch " + num(a.worstGap) + " h" : ""));
     });
     if (sm.derived) {
-      L.push("Total patrols per planning period: " + num(sm.derived.N_srt) +
-             ". Usable flying hours: " + num(sm.derived.B_eff) + " of " + num(sm.derived.B) + ".");
+      L.push("Sorties per planning period: " + num(sm.derived.N_srt) + ".");
     }
     if (sm.fleet) {
       const f = sm.fleet;
-      L.push("Fleet size: " + num(f.actual) + " aircraft available. Smallest fleet for zero loss (coverage 0.5): " +
-             num(f.nMinHalf) + ", counting whole patrols per aircraft: " + num(f.nMinHalfCorrected) +
-             ". Smallest fleet for full coverage (1.0): " + num(f.nMinFull) +
-             ", counting whole patrols per aircraft: " + num(f.nMinFullCorrected) +
-             ". Highest coverage this fleet can reach: " + num(f.maxCoverage) + ".");
+      L.push("Fleet: " + num(f.actual) + " aircraft available. Smallest fleet for zero expected loss (coverage 0.5): " +
+             num(f.nMinHalf) + " (corrected: " + num(f.nMinHalfCorrected) +
+             "). Smallest fleet for guaranteed full coverage (coverage 1): " + num(f.nMinFull) +
+             " (corrected: " + num(f.nMinFullCorrected) +
+             "). Highest coverage this fleet can reach: " + num(f.maxCoverage) + ".");
     }
     L.push("");
 
     const strategies = pl.strategies || [];
-    L.push("Plans: " + plural(strategies.length, "plan", "plans") +
-           ". One plan is chosen at random each period with the probability shown. " +
-           "Patrol counts below are whole patrols per planning period for all areas of that kind together.");
+    L.push("Plans: " + plural(strategies.length, "plan", "plans") + ", each with a probability.");
     strategies.forEach((st, i) => {
       L.push("Plan " + (i + 1) + ", probability " + num(st.prob) + ": " + st.label + ".");
       (st.barriers || []).forEach(b => {
-        L.push("  " + b.key + ": " + plural(b.q, "patrol", "patrols") +
+        const hrs = (s.tau_p !== undefined && s.tau_p !== "") ? " (" + num(Number(b.q) * Number(s.tau_p)) + " flying hours)" : "";
+        L.push("  " + b.key + ": " + plural(b.q, "patrol", "patrols") + hrs +
                (b.delta ? ", one every " + num(b.delta) + " h" : "") + ", coverage " + num(b.cov));
       });
     });
