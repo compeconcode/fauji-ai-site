@@ -44,7 +44,7 @@
     L.push("How the planner works:");
     L.push("- It treats the task as a game. The air force commits to a randomised patrol plan, and an adversary then strikes " +
            "the kind of area where the air force does worst. The planner chooses the split of flying hours that makes this " +
-           "worst case as good as possible. The game value z* is that worst case: higher is better, and 0 is break-even.");
+           "worst case as good as possible. The game value z* is that worst case, given as a score (not a ratio): higher is better, and 0 is break-even.");
     L.push("- Coverage is the chance that an area is protected at a given moment. A patrol protects its area for the patrol " +
            "time plus the secure period after it.");
     L.push("- Each kind of area gets a score: value x (2 x coverage - 1). Coverage 0.5 scores 0. The planner splits the hours " +
