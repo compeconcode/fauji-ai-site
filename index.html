@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Fauji LLM, base vs baseline (search)</title>
+<title>Fauji LLM, fine-tuned Qwen vs Mistral Small (both with search)</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
 <style>
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 40px auto; max-width: 1100px; color: #1a1a1a; }
@@ -45,7 +45,7 @@
 <body>
 
 <h1>Armed forces doctrine language model, side by side</h1>
-<p class="sub">Type a question below, the same prompt is sent to the plain base model (no search) and to the fauji.ai baseline (same model + doctrine search). Responses stream in as they're generated, rendered as markdown.</p>
+<p class="sub">Type a question below. The same question and the same document search are used for the fine-tuned fauji.ai Qwen model (left, as used by the chatbot) and for Mistral Small 3.2 (right, not fine-tuned). Responses stream in as they're generated, rendered as markdown.</p>
 
 <textarea id="prompt" rows="3">What is meant by force protection in a joint operations context?</textarea>
 <br>
@@ -55,11 +55,11 @@
 
 <div class="columns">
   <div class="col base">
-    <div class="label">Base model, no search</div>
+    <div class="label">fauji.ai fine-tuned Qwen + doctrine search</div>
     <div id="baseOut" class="response"></div>
   </div>
   <div class="col finetuned">
-    <div class="label">fauji.ai baseline: base model + doctrine search</div>
+    <div class="label">Mistral Small 3.2 24B + doctrine search (not fine-tuned)</div>
     <div id="ftOut" class="response"></div>
     <div id="ftSources"></div>
   </div>
