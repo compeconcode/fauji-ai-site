@@ -2,76 +2,171 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a5c3f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="fauji.ai">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>fauji.ai: AI assistant who speaks Indian Armed Forces language</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<link rel="stylesheet" href="skills/skills_panel.css">
 <style>
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; color: #1a1a1a; }
-  #layout { display: flex; height: 100vh; }
-  #chatCol { flex: 1 1 auto; max-width: 760px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column;
-             height: 100vh; box-sizing: border-box; min-width: 0; }
-  #topRow { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid #e3e3e3; }
+  /* v4 look. Loaded after skills_panel.css so these rules win where both set the same thing. */
+  :root { --green: #1a5c3f; --line: #e6e6e6; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; color: #1a1a1a; background: #fff; }
+  button { font-family: inherit; }
+  #layout { display: flex; height: 100vh; height: 100dvh; }
+  #chatCol { flex: 1 1 auto; max-width: 840px; margin: 0 auto; padding: 0 20px 10px; display: flex; flex-direction: column;
+             height: 100vh; height: 100dvh; box-sizing: border-box; min-width: 0; }
+
+  /* header */
+  #topRow { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 12px 0 10px; border-bottom: 1px solid var(--line); }
   .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
-  .logo { flex: none; width: 38px; height: 38px; border-radius: 10px; background: #1a5c3f; color: white;
-          display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; }
-  .brand .name { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
-  .brand .name span { color: #1a5c3f; }
-  .brand .tag { font-size: 13px; color: #666; line-height: 1.3; }
-  .demo-note { font-size: 12px; color: #b45309; margin: 0 0 8px; }
-  #about { margin: 0 0 12px; font-size: 13px; color: #555; }
-  #about summary { cursor: pointer; color: #1a5c3f; font-weight: 600; width: fit-content; }
-  #about p { margin: 6px 0 0; line-height: 1.5; }
+  .logo { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--green); color: white;
+          display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+  .brand .name { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
+  .brand .name span { color: var(--green); }
+  .brand .tag { font-size: 12.5px; color: #777; line-height: 1.3; }
+  #headBtns { display: flex; align-items: center; gap: 8px; flex: none; }
+  .hbtn { border: 1px solid #d9d9d9; background: white; color: #333; border-radius: 8px; padding: 6px 12px;
+          font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .hbtn:hover { background: #f4f4f4; }
+  #infoBtn, #newChatBtn { width: 30px; height: 30px; padding: 0; border-radius: 50%; color: #666; display: inline-flex; align-items: center; justify-content: center; }
+  #skillsBtn { border: 1px solid var(--green); background: white; color: var(--green); border-radius: 8px;
+               padding: 6px 12px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  #skillsBtn:hover { background: #eef6f1; }
+  #about { margin: 10px 0 0; padding: 10px 14px; font-size: 13px; line-height: 1.5; color: #555;
+           background: #f6f8f7; border: 1px solid var(--line); border-radius: 10px; }
+  #about[hidden] { display: none; }
+  #about p { margin: 0; }
 
-  #chatWindow { flex: 1; overflow-y: auto; border: 1px solid #ddd; border-radius: 10px; padding: 16px;
-                display: flex; flex-direction: column; gap: 14px; background: #fafafa; }
-
-  .msg { max-width: 85%; padding: 10px 14px; border-radius: 10px; line-height: 1.5; font-size: 14px; }
-  .msg.user { align-self: flex-end; background: #1a5c3f; color: white; }
-  .msg.assistant { align-self: flex-start; background: white; border: 1px solid #e0e0e0; }
-  .msg.assistant .response p { margin: 0 0 8px; }
-  .msg.assistant .response ul, .msg.assistant .response ol { margin: 0 0 8px; padding-left: 20px; }
+  /* messages */
+  #chatWindow { flex: 1; overflow-y: auto; padding: 18px 0; display: flex; flex-direction: column; gap: 22px; }
+  #chatWindow { scrollbar-width: none; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  #chatWindow::-webkit-scrollbar { display: none; }
+  #chatWindow:empty { display: none; }
+  .msg { line-height: 1.6; font-size: 15px; }
+  .msg.user { align-self: flex-end; max-width: 80%; background: var(--green); color: white; padding: 10px 16px;
+              border-radius: 18px 18px 4px 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.assistant { align-self: stretch; position: relative; padding-left: 42px; min-width: 0; }
+  .msg.assistant::before { content: "F"; position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+                           background: var(--green); color: white; font-weight: 700; font-size: 15px;
+                           display: flex; align-items: center; justify-content: center; }
+  .msg.assistant .response { overflow-wrap: anywhere; }
+  .msg.assistant .response > :first-child { margin-top: 0; }
+  .msg.assistant .response p { margin: 0 0 10px; }
+  .msg.assistant .response ul, .msg.assistant .response ol { margin: 0 0 10px; padding-left: 22px; }
   .msg.assistant .response code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
   .msg.assistant .response pre { background: rgba(0,0,0,0.06); padding: 8px 10px; border-radius: 6px; overflow-x: auto; }
+  .msg.assistant .response table { border-collapse: collapse; margin: 0 0 10px; display: block; overflow-x: auto; }
+  .msg.assistant .response th, .msg.assistant .response td { border: 1px solid #ddd; padding: 4px 8px; font-size: 14px; }
 
-  .toolbar { margin-top: 8px; display: flex; gap: 6px; align-items: center; }
-  .toolbar button { border: 1px solid #ddd; background: white; border-radius: 6px; padding: 4px 9px;
-                     font-size: 13px; cursor: pointer; color: #555; }
-  .toolbar button.active-up { background: #e6f4ea; border-color: #1a5c3f; color: #1a5c3f; }
-  .toolbar button.active-down { background: #fdeaea; border-color: #b3261e; color: #b3261e; }
-  .toolbar button:hover { background: #f0f0f0; }
-  .toolbar .feedback-status { font-size: 12px; color: #888; }
+  /* waiting dots: shown only while an answer is being generated and nothing has arrived yet */
+  .msg.assistant .response:empty::after { content: none; }
+  body:has(#stopBtn:not(:disabled)) .msg.assistant .response:empty::after {
+    content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #9a9a9a;
+    margin: 12px 30px 0 4px; box-shadow: 12px 0 #9a9a9a, 24px 0 #9a9a9a; animation: fauji-wait 1.1s ease-in-out infinite; }
+  @keyframes fauji-wait { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
+  /* icons under each answer */
+  .toolbar { margin-top: 6px; display: flex; gap: 2px; align-items: center; }
+  .toolbar button { border: none; background: none; border-radius: 6px; padding: 5px 7px; color: #777; cursor: pointer;
+                    display: inline-flex; align-items: center; }
+  .toolbar button:hover { background: #f0f0f0; color: #333; }
+  .toolbar button.copied { color: var(--green); }
+  .toolbar button.active-up { background: #e6f4ea; color: var(--green); }
+  .toolbar button.active-down { background: #fdeaea; color: #b3261e; }
+  .toolbar .feedback-status { font-size: 12px; color: #888; margin-left: 6px; }
   .truncated-note { font-size: 12px; color: #b45309; font-style: italic; margin-top: 6px; }
 
-  #inputRow { display: flex; gap: 8px; margin-top: 14px; }
-  #promptInput { flex: 1; padding: 10px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 8px;
-                 resize: none; font-family: inherit; }
-  #inputRow button { padding: 0 18px; border: none; border-radius: 8px; background: #1a5c3f; color: white;
-                      font-size: 14px; cursor: pointer; }
-  #inputRow button:disabled { background: #999; cursor: default; }
-  #stopBtn { background: #b3261e; }
-  .status { font-size: 12px; color: #888; margin-top: 6px; min-height: 16px; }
-
-  .sources { margin-top: 10px; font-size: 12px; color: #555; }
-  .sources summary { cursor: pointer; color: #1a5c3f; font-weight: 600; }
+  .sources { margin-top: 8px; font-size: 12px; color: #555; }
+  .sources summary { cursor: pointer; color: #666; font-weight: 600; width: fit-content; }
   .sources ol { margin: 6px 0 0; padding-left: 20px; }
   .sources li { margin-bottom: 6px; }
   .sources .doc { font-weight: 600; color: #333; }
   .sources .snip { white-space: pre-wrap; color: #666; }
-  .sources .doc.uploaded { color: #1a5c3f; }
+  .sources .doc.uploaded { color: var(--green); }
 
-  #docChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  /* empty screen (shown by CSS only while the chat window has no messages) */
+  #welcome { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center;
+             gap: 8px; text-align: center; padding: 20px 0; }
+  #chatWindow:empty + #welcome { display: flex; }
+  #welcome .logo { width: 52px; height: 52px; border-radius: 14px; font-size: 28px; }
+  #welcome h1 { margin: 6px 0 0; font-size: 26px; letter-spacing: -0.01em; }
+  #welcome h1 span { color: var(--green); }
+  #welcome p { margin: 0 0 14px; color: #777; font-size: 14px; }
+  .examples { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 640px; }
+  .ex { text-align: left; border: 1px solid var(--line); background: white; border-radius: 12px; padding: 12px 14px;
+        font-size: 13.5px; line-height: 1.4; color: #333; cursor: pointer; }
+  .ex:hover { background: #f6f8f7; border-color: var(--green); }
+
+  /* attached files, patrol-plan chip and the "open the planner?" question sit above the input box */
+  #docChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   #docChips:empty { display: none; }
-  .chip { display: flex; align-items: center; gap: 6px; background: #eef6f1; border: 1px solid #1a5c3f;
-          color: #1a5c3f; border-radius: 14px; padding: 3px 6px 3px 10px; font-size: 12px; max-width: 100%; }
+  .chip { display: flex; align-items: center; gap: 6px; background: #eef6f1; border: 1px solid var(--green);
+          color: var(--green); border-radius: 14px; padding: 3px 6px 3px 10px; font-size: 12px; max-width: 100%; }
   .chip.busy { background: #fff7e0; border-color: #b45309; color: #b45309; }
-  .chip .x { cursor: pointer; border: none; background: none; color: #b3261e; font-size: 15px; padding: 0 4px;
-             line-height: 1; }
-  #inputRow #attachBtn { background: white; color: #1a5c3f; border: 1px solid #1a5c3f; padding: 0 12px;
-                         font-size: 16px; }
-  .notice { font-size: 12px; color: #b45309; margin-top: 6px; }
+  .chip .x { cursor: pointer; border: none; background: none; color: #b3261e; font-size: 15px; padding: 0 4px; line-height: 1; }
+
+  /* input box */
+  #inputRow { display: flex; align-items: flex-end; box-sizing: border-box; gap: 6px; margin-top: 10px; padding: 4px 4px 4px 8px;
+              border: 1px solid #d0d0d0; border-radius: 24px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  #inputRow:focus-within { border-color: var(--green); }
+  #promptInput { flex: 1; min-width: 0; border: none; outline: none; resize: none; background: transparent;
+                 font-family: inherit; font-size: 15px; line-height: 20px; padding: 6px 4px; box-sizing: border-box; height: 32px; max-height: 180px; display: block; scrollbar-width: none; }
+  #promptInput::-webkit-scrollbar { display: none; }
+  #inputRow button { flex: none; width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer;
+                     display: flex; align-items: center; justify-content: center; }
+  #inputRow #attachBtn { background: transparent; color: #555; }
+  #inputRow #attachBtn:hover { background: #f0f0f0; }
+  #inputRow #sendBtn { background: var(--green); color: white; }
+  #inputRow.empty #sendBtn { background: #c4d2ca; cursor: default; }
+  #inputRow #stopBtn { background: #b3261e; color: white; }
+  #inputRow #sendBtn:disabled, #inputRow #stopBtn:disabled { display: none; }   /* one round button: Send, or Stop while streaming */
+  .status { font-size: 12px; color: #888; margin-top: 6px; min-height: 16px; text-align: center; }
+  .notice { font-size: 12px; color: #b45309; margin-top: 2px; text-align: center; }
   .notice:empty { display: none; }
+
+  /* touch screens have no hover, so the attach warning is shown as a small line */
+  .demo-note { display: none; font-size: 11.5px; color: #b45309; text-align: center; margin-top: 2px; }
+  @media (hover: none) { .demo-note { display: block; } }
+
+  /* phones and small tablets */
+  @media (max-width: 700px) {
+    #chatCol { padding: 0 12px calc(8px + env(safe-area-inset-bottom)); }
+    #topRow { padding: 10px 0 8px; gap: 8px; }
+    .brand .tag { display: none; }                         /* the long tagline does not fit next to the buttons */
+    .brand .name { font-size: 18px; }
+    .hbtn, #skillsBtn { min-height: 36px; }
+    #infoBtn, #newChatBtn { width: 36px; height: 36px; }
+    #chatWindow { padding: 14px 0; gap: 18px; }
+    .msg { font-size: 15px; }
+    .msg.user { max-width: 88%; }
+    .msg.assistant { padding-left: 36px; }
+    .msg.assistant::before { width: 26px; height: 26px; font-size: 13px; }
+    .toolbar { gap: 0; }
+    .toolbar button { padding: 9px 11px; }                 /* bigger touch targets */
+    .examples { grid-template-columns: 1fr; }
+    #welcome h1 { font-size: 24px; }
+    #welcome .logo { width: 46px; height: 46px; font-size: 24px; }
+    #promptInput { font-size: 16px; }                      /* 16 px stops iPhones zooming in when the box is tapped */
+    #inputRow #attachBtn, #inputRow #sendBtn, #inputRow #stopBtn { width: 36px; height: 36px; }
+    #promptInput { height: 36px; line-height: 20px; padding: 8px 4px; }
+
+    /* Skills panel: full screen instead of beside the chat; its x button returns to the chat */
+    #layout.open #chatCol { display: none; }
+    #layout.open #sidePanel, #layout.open.chat-hidden #sidePanel { width: 100%; min-width: 0; flex: 1 1 auto; height: 100vh; height: 100dvh; }
+    #layout #spDivider { display: none; }
+    #spChatToggle { display: none; }
+    .sp-head { padding: 10px 12px; }
+    .sp-head button { padding: 7px 12px; }
+  }
 </style>
-<link rel="stylesheet" href="skills/skills_panel.css">
 </head>
 <body>
 
@@ -86,25 +181,46 @@
       <div class="tag">AI assistant who speaks Indian Armed Forces language</div>
     </div>
   </div>
-  <button id="skillsBtn" title="Open the skills panel (patrol planner)">Skills</button>
+  <div id="headBtns">
+    <button id="newChatBtn" class="hbtn" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+    <button id="infoBtn" class="hbtn" title="How this works" aria-label="How this works">?</button>
+    <button id="skillsBtn" title="Open the skills panel (patrol planner)">Skills</button>
+  </div>
 </div>
-<div class="demo-note">Public demo: do not attach sensitive or classified documents.</div>
-<details id="about">
-  <summary>How this works</summary>
-  <p>Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs to flag good or bad answers, that feedback is saved for review. Use the paperclip to attach a PDF, DOCX or TXT file (up to 3 files, 20 MB each): your questions are then answered from your file as well. The file is kept only for this chat session. Use Skills for the patrol planner.</p>
-</details>
+<div id="about" hidden>
+  <p>Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs under an answer to flag good or bad answers, that feedback is saved for review. Use the paperclip to attach a PDF, DOCX or TXT file (up to 3 files, 20 MB each): your questions are then answered from your file as well. The file is kept only for this chat session. Use Skills for the patrol planner.</p>
+</div>
 
-<div id="chatWindow"></div>
-<div class="status" id="status"></div>
-<div class="notice" id="notice"></div>
-<div id="docChips"></div>
+<div id="chatWindow"></div><div id="welcome">
+  <div class="logo" aria-hidden="true">F</div>
+  <h1>fauji<span>.ai</span></h1>
+  <p>Ask about Indian Armed Forces, NATO and USAF doctrine.</p>
+  <div class="examples">
+    <button class="ex" data-q="Explain the purpose of India's Joint Doctrine for Multi-Domain Operations.">Explain the purpose of India's Joint Doctrine for Multi-Domain Operations.</button>
+    <button class="ex" data-q="What does the Integrated Defence Staff do in the Indian tri-service structure, and why was it created?">What does the Integrated Defence Staff do, and why was it created?</button>
+    <button class="ex" data-q="What is meant by force protection in a joint operations context?">What is meant by force protection in a joint operations context?</button>
+    <button class="ex" data-q="Draft a situation report format for reporting an unidentified radar contact near the border.">Draft a situation report format for an unidentified radar contact.</button>
+  </div>
+</div>
 
-<div id="inputRow">
-  <button id="attachBtn" title="Attach a document (PDF, DOCX or TXT)" onclick="document.getElementById('fileInput').click()">&#128206;</button>
-  <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple style="display:none">
-  <textarea id="promptInput" rows="2" placeholder="Type a message..."></textarea>
-  <button id="sendBtn" onclick="sendMessage()">Send</button>
-  <button id="stopBtn" onclick="stopStreaming()" disabled>Stop</button>
+<div id="composer">
+  <div id="attachArea"><div id="docChips"></div></div>
+  <div id="inputRow" class="empty">
+    <button id="attachBtn" title="Attach a document (PDF, DOCX or TXT). Public demo: do not attach sensitive or classified documents." aria-label="Attach a document" onclick="document.getElementById('fileInput').click()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+    </button>
+    <input type="file" id="fileInput" accept=".pdf,.docx,.txt" multiple style="display:none">
+    <textarea id="promptInput" rows="1" placeholder="Message fauji.ai..."></textarea>
+    <button id="sendBtn" onclick="sendMessage()" title="Send" aria-label="Send">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+    </button>
+    <button id="stopBtn" onclick="stopStreaming()" title="Stop" aria-label="Stop" disabled>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+    </button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="notice" id="notice"></div>
+  <div class="demo-note">Public demo: do not attach sensitive or classified documents.</div>
 </div>
 
 </div><!-- /chatCol -->
@@ -171,6 +287,47 @@ promptInput.addEventListener('keydown', (e) => {
   }
 });
 
+// ---------------------------------------------------------------- v4 interface helpers (no change to chat/upload logic)
+const _svg = p => '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+const ICON = {
+  copy:  _svg('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
+  regen: _svg('<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'),
+  up:    _svg('<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>'),
+  down:  _svg('<path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/>')
+};
+
+// text box grows with the text (up to 180 px); Send turns grey while the box is empty
+function syncInput() {
+  promptInput.style.height = 'auto';
+  promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
+  document.getElementById('inputRow').classList.toggle('empty', !promptInput.value.trim());
+}
+promptInput.addEventListener('input', syncInput);
+
+async function copyAnswer(index, btn) {
+  try {
+    await navigator.clipboard.writeText(messages[index].content || '');
+    btn.classList.add('copied'); btn.title = 'Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.title = 'Copy answer'; }, 1500);
+  } catch (e) { status.textContent = 'Could not copy the answer.'; }
+}
+
+// New chat: clears the conversation only. Attached files stay (their chips remain visible; remove them with the x).
+function newChat() {
+  if (currentController) { status.textContent = 'Press Stop first, then start a new chat.'; return; }
+  messages = [];
+  if (window.resetPlanChat) window.resetPlanChat();   // detach the patrol plan too (defined in skills/skills_panel.js)
+  renderAll();
+  status.textContent = '';
+  notice('');
+  promptInput.value = '';
+  syncInput();
+  promptInput.focus();
+}
+document.getElementById('newChatBtn').onclick = newChat;
+document.getElementById('infoBtn').onclick = () => { const a = document.getElementById('about'); a.hidden = !a.hidden; };
+document.querySelectorAll('.ex').forEach(b => b.onclick = () => { promptInput.value = b.dataset.q; syncInput(); sendMessage(); });
+
 function renderAll() {
   chatWindow.innerHTML = "";
   messages.forEach((m, i) => {
@@ -211,19 +368,24 @@ function appendAssistantBubble(content, index, turnId, truncated, vote, sources)
   const toolbar = document.createElement('div');
   toolbar.className = 'toolbar';
 
+  const copyBtn = document.createElement('button');
+  copyBtn.innerHTML = ICON.copy; copyBtn.title = 'Copy answer';
+  copyBtn.onclick = () => copyAnswer(index, copyBtn);
+  toolbar.appendChild(copyBtn);
+
   const regenBtn = document.createElement('button');
-  regenBtn.textContent = '↻ Regenerate';
+  regenBtn.innerHTML = ICON.regen; regenBtn.title = 'Regenerate answer';
   regenBtn.onclick = () => regenerate(index);
   toolbar.appendChild(regenBtn);
 
   const upBtn = document.createElement('button');
-  upBtn.textContent = '👍';
+  upBtn.innerHTML = ICON.up; upBtn.title = 'Good answer';
   upBtn.className = vote === 'up' ? 'active-up' : '';
   upBtn.onclick = () => vote_(index, turnId, 'up', upBtn, downBtn);
   toolbar.appendChild(upBtn);
 
   const downBtn = document.createElement('button');
-  downBtn.textContent = '👎';
+  downBtn.innerHTML = ICON.down; downBtn.title = 'Bad answer';
   downBtn.className = vote === 'down' ? 'active-down' : '';
   downBtn.onclick = () => vote_(index, turnId, 'down', upBtn, downBtn);
   toolbar.appendChild(downBtn);
@@ -259,6 +421,7 @@ async function regenerate(index) {
 async function streamAssistantReply() {
   sendBtn.disabled = true;
   stopBtn.disabled = false;
+  syncInput();
   status.textContent = "Streaming...";
 
   currentController = new AbortController();
@@ -337,6 +500,7 @@ async function streamAssistantReply() {
     sendBtn.disabled = false;
     stopBtn.disabled = true;
     currentController = null;
+    syncInput();
   }
 }
 
@@ -470,9 +634,16 @@ async function vote_(index, turnId, voteValue, upBtn, downBtn) {
     feedbackStatus.textContent = "failed to save feedback";
   }
 }
+syncInput();
 </script>
 <script src="skills/patrol_plan_text.js"></script>
 <script src="skills/skills_panel.js"></script>
+<script>
+// PWA: the service worker only works on a web address (https), not when the file is opened from disk
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
 
 </body>
 </html>

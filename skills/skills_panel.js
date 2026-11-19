@@ -168,6 +168,9 @@
   // called by chatbot_v3.html for every question: the text to send, or "" when no plan is attached
   window.currentPlanContext = () => (planText && planAttached ? planText : "");
 
+  // called by the chat page's "New chat" button: forget the plan completely (chip gone, nothing sent with questions) and close the planner question
+  window.resetPlanChat = () => { planText = ""; planAttached = false; savePlanState(); renderPlanChip(); hideOffer(); };
+
   function savePlanState() {
     try { sessionStorage.setItem(PLAN_TEXT_KEY, planText); sessionStorage.setItem(PLAN_ATTACHED_KEY, planAttached ? "1" : "0"); }
     catch (e) {}
