@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Aircraft comparison</title>
+<link rel="stylesheet" href="patrol_style.css">
+<style>
+  /* Comparison report for the aircraft-specification skill. Loaded in the side panel's Result section.
+     It reads the table the server returned from sessionStorage["aircraftReport"] (written by
+     skills_panel.js) and draws it. Every value is shown exactly as the server sent it. */
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .bar label { display: flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
+  .bar input { width: auto; margin: 0; }
+  .bar .sp { margin-left: auto; }
+  .tw { overflow: auto; max-height: none; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+  table.rep { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13.5px; }
+  table.rep th, table.rep td { white-space: normal; vertical-align: top; padding: 8px 12px;
+                               border-bottom: 1px solid var(--rule-soft); min-width: 150px; }
+  table.rep thead th { position: sticky; top: 0; z-index: 2; background: var(--surface); text-transform: none;
+                       letter-spacing: 0; font-size: 14px; color: var(--ink); border-bottom: 1px solid var(--rule); }
+  table.rep thead th .sub { display: block; font-weight: 400; font-size: 12px; color: var(--ink3); margin-top: 2px; }
+  table.rep th.crit, table.rep td.crit { position: sticky; left: 0; z-index: 1; background: var(--surface);
+                       min-width: 120px; max-width: 160px; font-weight: 600; color: var(--ink2); font-size: 13px; }
+  table.rep thead th.crit { z-index: 3; }
+  table.rep tr.grp td { background: var(--raised); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+                        color: var(--ink3); font-weight: 600; padding: 6px 12px; }
+  table.rep tr.grp td.crit { background: var(--raised); }
+  .val { color: var(--ink); }
+  .val.none { color: var(--ink3); font-style: italic; }
+  .note { margin-top: 3px; font-size: 12px; line-height: 1.4; color: var(--ink2); }
+  body.nonotes .note { display: none; }
+  sup.ref a { color: var(--accent); text-decoration: none; font-size: 11px; margin-left: 3px; }
+  ol.src { margin: 0; padding-left: 22px; font-size: 13px; line-height: 1.5; }
+  ol.src li { margin-bottom: 4px; overflow-wrap: anywhere; }
+  ol.src a { color: var(--accent); }
+  h3.srch { margin: 0 0 6px; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="empty" class="msg note hidden">No comparison yet. Choose aircraft in Inputs and press Show comparison.</div>
+  <div id="report" class="hidden">
+    <div class="bar">
+      <label><input type="checkbox" id="showNotes"> Show notes</label>
+      <span class="sp"></span>
+      <button type="button" id="csv">Download CSV</button>
+    </div>
+    <div class="tw" style="margin-top:12px"><table class="rep" id="tbl"></table></div>
+    <div style="margin-top:16px">
+      <h3 class="srch">Sources</h3>
+      <ol class="src" id="sources"></ol>
+    </div>
+    <footer style="margin-top:16px">Public figures only. Indian variants can differ from published figures; check the source before relying on a number.</footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  var REPORT_KEY = "aircraftReport", NOTES_KEY = "aircraftShowNotes";
+  var $ = function (id) { return document.getElementById(id); };
+  var NONE = { "not published": 1, "not applicable": 1 };
+
+  var data = null;
+  try { data = JSON.parse(sessionStorage.getItem(REPORT_KEY) || "null"); } catch (e) {}
+  if (!data || !data.aircraft || !data.groups) { $("empty").classList.remove("hidden"); return; }
+
+  // How a value is written in the table: "24,500 kg", "Mach 1.8", "2020" (years without a unit word)
+  function shown(c) {
+    if (NONE[c.value] || !c.unit || c.unit === "year") return c.value;
+    if (c.unit === "Mach") return "Mach " + c.value;
+    return c.value + " " + c.unit;
+  }
+
+  // Number the sources in the order they first appear in the table
+  var srcIndex = {}, srcList = [];
+  function srcNo(c) {
+    if (!c.source) return 0;
+    var key = c.source + "|" + c.source_url;
+    if (!srcIndex[key]) { srcList.push(c); srcIndex[key] = srcList.length; }
+    return srcIndex[key];
+  }
+
+  var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  var tbl = $("tbl");
+  var thead = el("thead"), hr = el("tr");
+  hr.appendChild(el("th", "crit", "Criterion"));
+  data.aircraft.forEach(function (a) {
+    var th = el("th", null, a.name);
+    th.appendChild(el("span", "sub", a.category + " · " + a.services.join(", ")));
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr); tbl.appendChild(thead);
+
+  var tbody = el("tbody");
+  data.groups.forEach(function (g) {
+    var gr = el("tr", "grp"), gc = el("td", "crit", g.group);
+    gr.appendChild(gc);
+    var rest = el("td"); rest.colSpan = data.aircraft.length; gr.appendChild(rest);
+    tbody.appendChild(gr);
+    g.rows.forEach(function (row) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "crit", row.label));
+      row.cells.forEach(function (c) {
+        var td = el("td");
+        var v = el("span", "val" + (NONE[c.value] ? " none" : ""), shown(c));
+        td.appendChild(v);
+        var n = srcNo(c);
+        if (n) {
+          var sup = el("sup", "ref"), a = el("a", null, "[" + n + "]");
+          a.href = "#src-" + n; a.title = c.source; sup.appendChild(a); td.appendChild(sup);
+        }
+        if (c.note) td.appendChild(el("div", "note", c.note));
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  });
+  tbl.appendChild(tbody);
+
+  srcList.forEach(function (c, i) {
+    var li = el("li"); li.id = "src-" + (i + 1);
+    li.appendChild(document.createTextNode(c.source + " "));
+    if (c.source_url) {
+      var a = el("a", null, c.source_url); a.href = c.source_url; a.target = "_blank"; a.rel = "noopener noreferrer";
+      li.appendChild(a);
+    }
+    $("sources").appendChild(li);
+  });
+
+  // "Show notes" switch, remembered for this tab (on by default)
+  var notesOn = true;
+  try { notesOn = sessionStorage.getItem(NOTES_KEY) !== "0"; } catch (e) {}
+  $("showNotes").checked = notesOn;
+  document.body.classList.toggle("nonotes", !notesOn);
+  $("showNotes").onchange = function () {
+    document.body.classList.toggle("nonotes", !this.checked);
+    try { sessionStorage.setItem(NOTES_KEY, this.checked ? "1" : "0"); } catch (e) {}
+  };
+
+  // CSV: one row per criterion; for each aircraft its value, note, source and source link
+  $("csv").onclick = function () {
+    var q = function (s) { s = String(s == null ? "" : s); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    var head = ["Group", "Criterion"];
+    data.aircraft.forEach(function (a) { head.push(a.name, a.name + " note", a.name + " source", a.name + " source link"); });
+    var lines = [head.map(q).join(",")];
+    data.groups.forEach(function (g) {
+      g.rows.forEach(function (row) {
+        var cols = [g.group, row.label];
+        row.cells.forEach(function (c) { cols.push(shown(c), c.note, c.source, c.source_url); });
+        lines.push(cols.map(q).join(","));
+      });
+    });
+    var blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    var link = el("a"); link.href = URL.createObjectURL(blob);
+    link.download = "aircraft_comparison_" + data.aircraft.map(function (a) { return a.id; }).join("_") + ".csv";
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+  };
+
+  $("report").classList.remove("hidden");
+})();
+</script>
+</body></html>

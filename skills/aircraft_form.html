@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Aircraft specifications: choose aircraft</title>
+<link rel="stylesheet" href="patrol_style.css">
+<style>
+  /* Picker for the aircraft-specification skill. Loaded in the side panel's Inputs section.
+     It never calls the server itself: it asks the chat page (window.parent) by postMessage, the page
+     calls the server with the API key and answers. Same pattern as patrol_form.html. */
+  .cat { margin: 0 0 14px; }
+  .cat h3 { margin: 0 0 6px; font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink3); }
+  .pick { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 1px solid var(--rule);
+          border-radius: 6px; background: var(--raised); margin-bottom: 6px; cursor: pointer; font-size: 14px; }
+  .pick input { width: auto; margin: 0; }
+  .pick .svc { margin-left: auto; font-size: 12px; color: var(--ink3); }
+  .pick.off { opacity: .45; cursor: not-allowed; }
+  .count { font-size: 13px; color: var(--ink2); }
+  #loading { font-size: 14px; color: var(--ink2); }
+</style>
+</head>
+<body>
+<div class="wrap narrow">
+  <p class="lead">Choose up to four aircraft, then press Show comparison.</p>
+  <div id="errBox" class="msg err hidden"><b>Problem</b> <span id="errMsg"></span></div>
+
+  <form id="form" class="card" autocomplete="off">
+    <h2>Aircraft</h2>
+    <div class="body">
+      <div id="loading">Loading the aircraft list…</div>
+      <div id="cats"></div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary" id="go" disabled>Show comparison</button>
+      <span class="count" id="count">0 of 4 chosen</span>
+      <span class="sp"></span>
+      <button type="button" id="clear">Clear</button>
+    </div>
+  </form>
+  <footer>Figures come from the aircraft library on the fauji.ai server. Each value names its source.</footer>
+</div>
+
+<script>
+(function () {
+  var MAX = 4;
+  var SEL_KEY = "aircraftSelected";          // remembered for this browser tab
+  var $ = function (id) { return document.getElementById(id); };
+  var chosen = [];
+  try { chosen = JSON.parse(sessionStorage.getItem(SEL_KEY) || "[]") || []; } catch (e) { chosen = []; }
+
+  function save() { try { sessionStorage.setItem(SEL_KEY, JSON.stringify(chosen)); } catch (e) {} }
+  function showError(msg) { $("errMsg").textContent = msg; $("errBox").classList.toggle("hidden", !msg); }
+
+  function refresh() {
+    var boxes = document.querySelectorAll("#cats input[type=checkbox]");
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i], full = chosen.length >= MAX && !b.checked;
+      b.disabled = full;
+      b.parentNode.classList.toggle("off", full);
+    }
+    $("count").textContent = chosen.length + " of " + MAX + " chosen";
+    $("go").disabled = chosen.length === 0;
+  }
+
+  function render(categories) {
+    $("loading").remove();
+    var known = {};
+    categories.forEach(function (cat) {
+      var box = document.createElement("div"); box.className = "cat";
+      var h = document.createElement("h3"); h.textContent = cat.category; box.appendChild(h);
+      cat.aircraft.forEach(function (a) {
+        known[a.id] = true;
+        var lab = document.createElement("label"); lab.className = "pick";
+        var cb = document.createElement("input"); cb.type = "checkbox"; cb.value = a.id;
+        cb.checked = chosen.indexOf(a.id) >= 0;
+        cb.onchange = function () {
+          if (cb.checked) { if (chosen.indexOf(a.id) < 0) chosen.push(a.id); }
+          else chosen = chosen.filter(function (x) { return x !== a.id; });
+          save(); refresh(); showError("");
+        };
+        var name = document.createElement("span"); name.textContent = a.name;
+        var svc = document.createElement("span"); svc.className = "svc"; svc.textContent = a.services.join(", ");
+        lab.appendChild(cb); lab.appendChild(name); lab.appendChild(svc);
+        box.appendChild(lab);
+      });
+      $("cats").appendChild(box);
+    });
+    chosen = chosen.filter(function (x) { return known[x]; }).slice(0, MAX);   // drop anything no longer in the library
+    save(); refresh();
+  }
+
+  if (window.parent === window) {
+    $("loading").textContent = "Open this page from the fauji.ai chat (Skills > Aircraft specifications).";
+    return;
+  }
+  window.addEventListener("message", function (e) {
+    if (e.source !== window.parent) return;           // only the chat page that contains this form
+    var m = e.data || {};
+    if (m.type === "aircraft-list-result") {
+      if (m.ok) render(m.categories);
+      else { $("loading").textContent = ""; showError(m.error || "The aircraft list could not be loaded."); }
+    } else if (m.type === "aircraft-compare-result") {
+      $("go").textContent = "Show comparison"; refresh();
+      showError(m.ok ? "" : (m.error || "The comparison could not be made."));
+    }
+  });
+  window.parent.postMessage({ type: "aircraft-list" }, "*");
+
+  $("form").onsubmit = function (e) {
+    e.preventDefault();
+    if (!chosen.length) return;
+    showError("");
+    $("go").disabled = true; $("go").textContent = "Loading…";
+    window.parent.postMessage({ type: "aircraft-compare", ids: chosen.slice() }, "*");
+  };
+  $("clear").onclick = function () { chosen = []; save(); var b = document.querySelectorAll("#cats input"); for (var i = 0; i < b.length; i++) b[i].checked = false; refresh(); showError(""); };
+})();
+</script>
+</body></html>

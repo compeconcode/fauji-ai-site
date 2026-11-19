@@ -184,11 +184,11 @@
   <div id="headBtns">
     <button id="newChatBtn" class="hbtn" title="New chat" aria-label="New chat"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
     <button id="infoBtn" class="hbtn" title="How this works" aria-label="How this works">?</button>
-    <button id="skillsBtn" title="Open the skills panel (patrol planner)">Skills</button>
+    <button id="skillsBtn" title="Open the skills panel (patrol planner, aircraft specifications)">Skills</button>
   </div>
 </div>
 <div id="about" hidden>
-  <p>Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs under an answer to flag good or bad answers, that feedback is saved for review. Use the paperclip to attach a PDF, DOCX or TXT file (up to 3 files, 20 MB each): your questions are then answered from your file as well. The file is kept only for this chat session. Use Skills for the patrol planner.</p>
+  <p>Answers are based on searched doctrine excerpts (shown under each answer as Sources). Responses stream in live. Use the thumbs under an answer to flag good or bad answers, that feedback is saved for review. Use the paperclip to attach a PDF, DOCX or TXT file (up to 3 files, 20 MB each): your questions are then answered from your file as well. The file is kept only for this chat session. Use Skills for the patrol planner and the aircraft specifications.</p>
 </div>
 
 <div id="chatWindow"></div><div id="welcome">
@@ -231,6 +231,7 @@
     <label for="skillSelect">Skill</label>
     <select id="skillSelect">
       <option value="patrol_planning">Patrol planner</option>
+      <option value="aircraft_specs">Aircraft specifications</option>
     </select>
     <span class="sp-grow"></span>
     <button id="spChatToggle" title="Hide or show the chat">Hide chat</button>
@@ -433,6 +434,7 @@ async function streamAssistantReply() {
 
   const docIds = docs.filter(d => d.doc_id && !d.busy).map(d => d.doc_id);
   const planText = (window.currentPlanContext && window.currentPlanContext()) || "";   // attached patrol plan (skills/skills_panel.js)
+  const aircraftIds = (window.currentAircraftContext && window.currentAircraftContext()) || null;   // attached aircraft (same file)
   messages[placeholderIndex].with_doc = docIds.length > 0 || !!planText;               // such turns are kept out of the logs
 
   try {
@@ -442,7 +444,8 @@ async function streamAssistantReply() {
       body: JSON.stringify({
         messages: messages.slice(0, placeholderIndex).map(m => ({ role: m.role, content: m.content })),
         ...(docIds.length ? { session_id: SESSION_ID, doc_ids: docIds } : {}),
-        ...(planText ? { plan_context: planText } : {})
+        ...(planText ? { plan_context: planText } : {}),
+        ...(aircraftIds ? { aircraft_ids: aircraftIds } : {})
       }),
       signal: currentController.signal
     });
